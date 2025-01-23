@@ -14,6 +14,12 @@ class Aggregator(nn.Module, ABC):
         self.w_k = nn.Linear(args.hidden_dim, args.hidden_dim, bias=False)
         self.w_v = nn.Linear(args.hidden_dim, args.hidden_dim, bias=False)
         self.dense = nn.Linear(args.hidden_dim, args.hidden_dim)
+        # self.ffn = nn.Sequential(
+        #     nn.Linear(args.hidden_dim, args.hidden_dim*2),
+        #     nn.ReLU(),
+        #     nn.Dropout(p=0.3),
+        #     nn.Linear(args.hidden_dim*2, args.hidden_dim),
+        # )
         self.n_head = args.n_head
 
     @abstractmethod
@@ -21,9 +27,10 @@ class Aggregator(nn.Module, ABC):
         pass
 
     @staticmethod
-    def attention(query, key, value, mask):
+    def attention(query, key, value, mask=None):
         d_k = key.size(-1)    # feature size
         # print(query.size(),key.size())
+        # (batch_size,1,feature_size)*(batch_size,row_size,feature_size)->(batch_size,1,row_size)
         scores = torch.matmul(query, key.transpose(-2, -1)) / \
             torch.sqrt(torch.tensor(d_k))
 
@@ -34,7 +41,7 @@ class Aggregator(nn.Module, ABC):
 
         attn = fn.softmax(scores, dim=-1)
 
-        return torch.matmul(attn, value)
+        return torch.matmul(attn, value), attn
 
     def start(self):
         for layer in self.modules():
@@ -86,12 +93,66 @@ class ParameterAggregator(Aggregator):
                                self.n_head, self.head_dim).transpose(-2, -3)
         mask = mask.unsqueeze(-3)
 
-        x = self.attention(query, key, value, mask)
+        x, _ = self.attention(query, key, value, mask)
 
         x = x.transpose(-2, -3).contiguous().reshape(batch_size,
                                                      node_size, -1, self.n_head*self.head_dim)
         x = torch.squeeze(x)
 
+        # x = self.dense(x)
+
+        # return self.ffn(x)+x
+        return self.dense(x)
+    
+
+class ParameterSparseAggregator(Aggregator):
+    def __init__(self) -> None:
+        super().__init__()
+        self._q = nn.Parameter(torch.randn(
+                (1, 1, args.hidden_dim)), requires_grad=True)
+        self.start()
+
+    @property
+    def parameter(self):
+        return self._q
+
+    @parameter.setter
+    def parameter(self, value):
+        if not isinstance(value, torch.Tensor):
+            raise TypeError(
+                f'parameter must be a torch.Tensor, but now is {type(value)}')
+        if value.dim() != 4:
+            raise ValueError(
+                f'parameter must be a 4-dim tensor, but now is {value.dim()}')
+        self._q = nn.Parameter(value,requires_grad=True)
+
+    def forward(self, data, mask=None):
+        # print(data.shape,mask.shape)
+        batch_size = data.shape[0]
+        feature_size = data.shape[-1]
+        self.head_dim = feature_size//self.n_head
+        if self.head_dim*self.n_head != feature_size:
+            raise ValueError(
+                f'feature_size must be divisible by n_head, but now feature_size is {feature_size}, n_head is {self.n_head}')
+
+        key = self.w_k(data).reshape(batch_size, -1,
+                                     self.n_head, self.head_dim).transpose(-2, -3)
+        value = self.w_v(data).reshape(batch_size, -1,
+                                       self.n_head, self.head_dim).transpose(-2, -3)
+        query = self._q.repeat(batch_size,1,1)
+        query = query.reshape(batch_size, -1,
+                               self.n_head, self.head_dim).transpose(-2, -3)
+        mask = mask.unsqueeze(-3)
+
+        x, attn = self.attention(query, key, value, mask)
+
+        x = x.transpose(-2, -3).contiguous().reshape(batch_size,
+                                                     -1, self.n_head*self.head_dim)
+        x = torch.squeeze(x)
+
+        # x = self.dense(x)
+
+        # return self.ffn(x)+x
         return self.dense(x)
 
 
@@ -108,8 +169,8 @@ class NodeAggregator(Aggregator):
 
 
         if args.add_par_pos_emb:
-            self.w_k = nn.Linear(args.hidden_dim*2, args.hidden_dim, bias=False)
-            self.w_v = nn.Linear(args.hidden_dim*2, args.hidden_dim, bias=False)
+            self.w_k = nn.Linear(args.hidden_dim, args.hidden_dim, bias=False)
+            self.w_v = nn.Linear(args.hidden_dim, args.hidden_dim, bias=False)
 
         self.start()
 
@@ -151,13 +212,17 @@ class NodeAggregator(Aggregator):
                                self.n_head, self.head_dim).transpose(-2, -3)
         mask = mask.unsqueeze(-3)
 
-        x = self.attention(query, key, value, mask)
+        x, attn = self.attention(query, key, value, mask)
 
         x = x.transpose(-2, -3).contiguous().reshape(batch_size, -
                                                      1, self.n_head*self.head_dim)
         x = torch.squeeze(x)
 
-        return self.dense(x)
+        # x = self.dense(x)
+
+        # return self.ffn(x)+x
+        return self.dense(x), attn
+    
 
 
 class StructureExtractor(nn.Module):
@@ -197,6 +262,12 @@ class GraphStructureAggregator(nn.Module):
         super().__init__()
         self.extractor=StructureExtractor()
         self.dense=nn.Linear(args.hidden_dim*3,args.hidden_dim)
+        # self.dense=nn.Sequential(
+        #     nn.Linear(args.hidden_dim*3, args.hidden_dim),
+        #     nn.ReLU(),
+        #     nn.Dropout(p=0.3),
+        #     nn.Linear(args.hidden_dim, args.hidden_dim),
+        # )
 
     def forward(self,graph_data):
         graph_data=self.extractor(graph_data)
@@ -236,18 +307,127 @@ class StructureAggregator(Aggregator):
                                self.n_head, self.head_dim).transpose(-2, -3)
         mask = mask.unsqueeze(-3)
 
-        x = self.attention(query, key, value, mask)
+        x, _ = self.attention(query, key, value, mask)
 
         x = x.transpose(-2, -3).contiguous().reshape(batch_size, -
                                                      1, self.n_head*self.head_dim)
         x = torch.squeeze(x)
 
-        return self.dense(x)
+        # x = self.dense(x)
 
+        # return self.ffn(x)+x
+        return self.dense(x)
+    
+
+try:
+    profile
+except NameError:
+    def profile(func):
+        return func
 
 # todo:后面还要确定一下图节点的参数的维度，在gin的输入维度处填写，这里先随便填了一个不存在的args的参数
 # todo:这里还有一个问题就是我把图神经网络只放了两层，后续如果要调这个超参的话，可以加一个args的参数
 class MainModel(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.node_aggregator = NodeAggregator()
+        self.parameter_aggregator = ParameterAggregator()
+        self.structure_aggregator = GraphStructureAggregator()
+
+
+        self.par_dense = nn.Linear(args.bin_num-1, args.hidden_dim)
+        # self.par_test = nn.Linear(args.bin_num-1, 1)
+
+        self.classifier = nn.Sequential(
+            nn.Linear(args.hidden_dim, args.hidden_dim//2),
+            nn.ReLU(),
+            nn.Dropout(p=0.3),
+            nn.Linear(args.hidden_dim//2, args.hidden_dim//4),
+            nn.ReLU(),
+            nn.Dropout(p=0.3),
+            nn.Linear(args.hidden_dim//4, 2),
+        )
+
+    @profile
+    def forward(self, dgl_graph, par_tensor, row_mask=None, node_mask=None, name=None):
+        # test = self.par_test(par_tensor)
+        par_feature = self.par_dense(par_tensor)  # 改变参数维度到hidden_dim
+        archi_feature = self.structure_aggregator(dgl_graph)   # 改变结构参数维度到hidden_dim
+        archi_feature = torch.unsqueeze(archi_feature, dim=1)  # 扩充第二维用于作为query
+        # print(archi_feature.shape)
+
+        par_feature = self.parameter_aggregator(
+            par_feature, mask=row_mask)  # 聚合row_size
+
+        # par_feature=torch.max(par_feature,dim=-2)[0]
+        
+        # print(par_feature.shape)
+        if args.use_q_node:
+            self.node_aggregator.parameter=archi_feature   # 设置query
+        
+        node_feature, node_attention = self.node_aggregator(
+            par_feature, mask=node_mask)  # 聚合node_size
+
+        # feature=torch.concat([node_feature,torch.squeeze(archi_feature)],dim=-1)
+
+        # print(node_feature.shape)
+        res=self.classifier(node_feature)
+        # print(res.shape)
+        return res, node_attention
+
+class MainSparseModel(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.node_aggregator = NodeAggregator()
+        self.parameter_aggregator = ParameterSparseAggregator()
+        self.structure_aggregator = GraphStructureAggregator()
+
+
+        self.par_dense = nn.Linear(args.bin_num-1, args.hidden_dim)
+        # self.par_test = nn.Linear(args.bin_num-1, 1)
+
+        self.classifier = nn.Sequential(
+            nn.Linear(args.hidden_dim, args.hidden_dim//2),
+            nn.ReLU(),
+            nn.Dropout(p=0.3),
+            nn.Linear(args.hidden_dim//2, args.hidden_dim//4),
+            nn.ReLU(),
+            nn.Dropout(p=0.3),
+            nn.Linear(args.hidden_dim//4, 2),
+        )
+
+    @profile
+    def forward(self, dgl_graph, par_tensor, row_mask=None, node_mask=None, name=None):
+        data_res, node_size_li=par_tensor
+
+        par_feature = self.par_dense(data_res)  # 改变参数维度到hidden_dim
+        archi_feature = self.structure_aggregator(dgl_graph)   # 改变结构参数维度到hidden_dim
+        archi_feature = torch.unsqueeze(archi_feature, dim=1)  # 扩充第二维用于作为query
+        # print(archi_feature.shape)
+
+        par_feature = self.parameter_aggregator(
+            par_feature, mask=row_mask)  # 聚合row_size
+
+        # par_feature=torch.max(par_feature,dim=-2)[0]
+        
+        # print(par_feature.shape)
+        if args.use_q_node:
+            self.node_aggregator.parameter=archi_feature   # 设置query
+        
+        par_feature_li = torch.split(par_feature,node_size_li)
+        par_feature = torch.nn.utils.rnn.pad_sequence(par_feature_li,batch_first=True)
+
+        node_feature, attn = self.node_aggregator(
+            par_feature, mask=node_mask)  # 聚合node_size
+
+        # feature=torch.concat([node_feature,torch.squeeze(archi_feature)],dim=-1)
+
+        # print(node_feature.shape)
+        res=self.classifier(node_feature)
+        # print(res.shape)
+        return res, attn
+
+class PosMainModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.node_aggregator = NodeAggregator()
@@ -267,7 +447,7 @@ class MainModel(nn.Module):
             nn.Linear(args.hidden_dim//4, 2),
         )
 
-    def forward(self, dgl_graph, par_tensor, row_mask=None, node_mask=None):
+    def forward(self, dgl_graph, par_tensor, row_mask=None, node_mask=None, pos_emb=None):
         par_feature = self.par_dense(par_tensor)  # 改变参数维度到hidden_dim
         archi_feature = self.structure_aggregator(dgl_graph)   # 改变结构参数维度到hidden_dim
         archi_feature = torch.unsqueeze(archi_feature, dim=1)  # 扩充第二维用于作为query
@@ -280,6 +460,9 @@ class MainModel(nn.Module):
         if args.use_q_node:
             self.node_aggregator.parameter=archi_feature   # 设置query
         
+        par_feature=pos_emb+par_feature
+        # par_feature=torch.concat((pos_emb,par_feature),dim=-1)
+
         node_feature = self.node_aggregator(
             par_feature, mask=node_mask)  # 聚合node_size
 
@@ -288,7 +471,6 @@ class MainModel(nn.Module):
         # print(res.shape)
         return res
 
-
 class ModelTestNodeAggregate(nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -296,7 +478,7 @@ class ModelTestNodeAggregate(nn.Module):
         self.node_aggregator = NodeAggregator()
 
         self.par_dense = nn.Linear(args.bin_num-1, args.hidden_dim)
-        self.archi_dense = nn.Linear(3, args.hidden_dim)
+        self.archi_dense = nn.Linear(9, args.hidden_dim)
 
         self.classifier = nn.Sequential(
             nn.Linear(args.hidden_dim, args.hidden_dim//2),

@@ -97,23 +97,13 @@ import os
 
 # subprocess.run(shlex.split(f'python main.py --lr {0.001} --weight_decay {0.0001}   --logdir {"./log_tmp/main/debug_base_three.log"}  --use_list {"leader_three"} --main --process_data --use_base --use_q_node --load_parameter'))
 
-# lr_li = ['1e-2','1e-3', '1e-4', '1e-5']
-# weight_decay_li = ['0', '1e-5','1e-4','1e-3','1e-2',]
-# lr_li = ['1e-4']
-# weight_decay_li = ['1e-3']
-
-# lr_li = ['1e-2','1e-3', '1e-4', '1e-5']
-# weight_decay_li = ['0',]
 lr_li = ['1e-3']
-# weight_decay_li = ['1e-7','1e-6', '1e-5','1e-4']
-weight_decay_li = ['1e-7']
+weight_decay_li = ['1e-5']
 
 for weight_decay in weight_decay_li:
     for lr in lr_li:
         try:
-            subprocess.run(shlex.split(f'python main.py --lr {lr} --weight_decay {weight_decay}   --logdir {"./log_tmp/main_augment/one_test.log"}  --use_list {"leader_one"} --augment --use_base --use_q_node --process_data --aug_level {3} --seed {0}'),check=True)
+            subprocess.run(shlex.split(f'python main.py --lr {lr} --weight_decay {weight_decay}   --logdir {"./log_tmp/main/base_three.log"}  --use_list {"leader_three"} --main --use_base --use_q_node --process_data'),check=True)
         except subprocess.CalledProcessError:
             file_logger.error('something wrong in run.py')
 
-# lllll
-# kernprof -v -l main.py --lr 1e-4 --weight_decay 1e-8   --logdir ./log_tmp/main/base_test.log  --use_list resnet --augment --use_base --use_q_node --process_data --aug_level 1 --epochs 10
