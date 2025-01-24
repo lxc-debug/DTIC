@@ -54,25 +54,20 @@ def onnx2dgl(
         raise ValueError(f'node size seeting small, needing {node_size}')
 
     for index, node in enumerate(graph.node):
-        # 首先是对参数的操作，然后是对结构的操作
         pos_arr[index] = index + 1
         arr = None
         for in_put in node.input:
-            # todo 对于没有参数的层，我只给了row_size为1，主要是为了给到两维，其余在coll_fn在后面padding
-            # 想了一下，这一版还是主要考虑w这个参数
             if in_put in parameter_dict.keys() and (in_put.split('.')[-1] == 'weight' and parameter_dict[in_put].ndim > 1) or (in_put.startswith('onnx::Conv') and parameter_dict[in_put].ndim == 4):
                 arr = parameter_dict[in_put]
-                parameter_li.append([arr, in_put])  # 后序使用的就是这个列表
+                parameter_li.append([arr, in_put])  
                             
 
-# todo 这个改掉一个bug，因为如果没有进入到内部循环的话，arr拿不到值，同样rowarr也没值，这样就不会加入到par_arr之中，所以就会导致拿到的值全部都是带参数的
         if arr is not None:
             row_size.append(arr.shape[0])
         else:
             row_size.append(0)
             parameter_li.append([torch.zeros((1, bin_num-1), dtype=torch.float32), None])
 
-        # 下面是处理图的数据的,这里的+1都是为了给空节点的0留位置
         op_type = np.zeros((op_type_size,), dtype=np.float32)
         op_index = op_li.index(node.op_type)
         op_type[op_index] = 1.
@@ -80,13 +75,11 @@ def onnx2dgl(
         pos = pos_emb(np.array([index+1], dtype=np.float32),
                       hidden_dim//2).reshape((-1,))
 
-        # 现在还缺的就是一个pos_emb，然后把这些东西展开拼起来，最后还有就是mask的大小还没有确定。
         struct_arr = np.concatenate((op_type,  pos),axis=-1)
         struct_tensor = torch.FloatTensor(struct_arr)
         graph_par_li.append(struct_tensor)
 
-        # 下面是处理结构的连边关系的
-        for out in node.output:  # 得到节点输出用来图的连接
+        for out in node.output:
             node_index[out] = index
 
         for in_put in node.input:
@@ -94,10 +87,9 @@ def onnx2dgl(
                 edge_src.append(node_index[in_put])
                 edge_dst.append(index)
 
-    # todo 到这里了       
 
     dgl_graph = dgl.to_bidirected(
-        dgl.graph((edge_src, edge_dst), num_nodes=node_size)) # 这里直接给定nodesize就行了
+        dgl.graph((edge_src, edge_dst), num_nodes=node_size)) 
 
     graph_par_tensor = torch.stack(graph_par_li,dim=0)
     # par_tensor = torch.FloatTensor(par_arr)
@@ -113,9 +105,7 @@ def convert_onnx_model(onnx_path:str):
     model = model.to(device)
     return model
 
-# def freeze_parameter(model:torch.nn.Module): # eval模式就是冻结参数的
-#     for _, parameter in model.named_parameters():
-#         parameter.requires_grad = False
+
 
 
 def get_onnx_model(onnx_path):
@@ -124,9 +114,9 @@ def get_onnx_model(onnx_path):
     
     graph = onnx_model.graph
 
-    parameter_dict = dict()  # 网络参数
+    parameter_dict = dict() 
 
-    for par in graph.initializer:  # 转换所有的网络参数
+    for par in graph.initializer: 
         
         par_np = np.frombuffer(
             par.raw_data, dtype=np.float32
@@ -145,7 +135,7 @@ def get_statistic(parameter_li:list):
             par_arr.append(arr_tuple[0])
         else:
             arr = arr_tuple[0]
-            if arr.ndim == 4:  # 这个是conv的参数
+            if arr.ndim == 4:  
                 row_shape, _, _, _ = arr.shape
                 arr = arr.reshape((row_shape, -1))
                         
@@ -158,7 +148,6 @@ def get_statistic(parameter_li:list):
 
             num_max = torch.max(arr)
             num_min = torch.min(arr)
-            # 把这个运算放到外面就只需要算一次了
             arr_norm = (arr - num_min) / (num_max - num_min)
 
             arr_mean = torch.mean(arr)
@@ -197,12 +186,6 @@ def get_statistic(parameter_li:list):
 
     return par_arr
 
-
-
-#todo 1. 首先根据函数推断哪三层要加掩码，给出对应位置
-#todo 2. 生成三个掩码，并根据对应位置，把全零矩阵加入到parameter_li中的对应元素中
-#todo 3. 循环，直到最终的结果发生转变，将原始数据置零
-#todo 4. 最后就是根据对应位置，修改原始graph的值，并导出为onnx文件
 
 def get_index(model:torch.nn.Module, data_tuple:tuple, parameter_li:list):
     model.eval()
@@ -260,7 +243,7 @@ def mitigate_onnx_model(model:torch.nn.Module, data_tuple:tuple, parameter_li:li
         print(f'epoch:{epoch}, loss:{loss.item()}, res:{res.tolist()}')
 
     parameter_li_copy = add_mask(parameter_li, mask_li)
-    return parameter_li_copy #todo 后续把这个函数写完
+    return parameter_li_copy
 
 def save_new_onnx_model(onnx_model, parameter_li:list, new_onnx_model_path:str):
 
@@ -268,7 +251,7 @@ def save_new_onnx_model(onnx_model, parameter_li:list, new_onnx_model_path:str):
     par_dict = dict()
     for item in parameter_li:
         par_dict[item[1]] = item[0]
-    for par in graph.initializer:  # 转换所有的网络参数
+    for par in graph.initializer: 
         if par.name in par_dict.keys():
             data = par_dict[par.name]
             par.raw_data = data.detach().numpy().tobytes()
@@ -307,9 +290,8 @@ def coll_fn(batch):
 
     row_mask=torch.stack(row_mask,dim=0).to(device)
     row_mask=torch.unsqueeze(row_mask,dim=1)
-    node_mask=torch.unsqueeze(node_mask,dim=1)  # 这里是扩展一维用于后续计算
+    node_mask=torch.unsqueeze(node_mask,dim=1)
 
-    # todo 下面就是padding的过程了,这里可以顺便遍历的时候把mask也整了
     data_tmp=list()
     for graph in data_li:
         data_tmp.extend(graph)

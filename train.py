@@ -15,14 +15,6 @@ import numpy as np
 
 class Experiment():
     def __init__(self, model: nn.Module, train_dataset, eval_dataset, test_dataset) -> None:
-        """_summary_
-            准备训练用到的dataloader，模型以及优化器，还有一些日志的保存路径
-        Arguments:
-            model -- 待训练的模型
-            train_dataset -- 训练数据集
-            eval_dataset -- 验证数据集
-            test_dataset -- 测试数据集
-        """
         self.train_dataset = train_dataset
         self.eval_dataset = eval_dataset
         self.test_dataset = test_dataset
@@ -61,11 +53,6 @@ class Experiment():
         self.esp = EarlyStopping(self.model, self.save_dir)
 
     def _train(self, epoch):
-        """_summary_
-            训练模型
-        Arguments:
-            epoch -- 第几次训练
-        """
         self.model.train()
 
         self.total_correct = 0
@@ -93,11 +80,6 @@ class Experiment():
 
     @torch.no_grad()
     def _eval(self, epoch):
-        """_summary_
-            模型验证
-        Arguments:
-            epoch -- 第几次验证
-        """
         self.model.eval()
 
         self.total_eval_correct = 0
@@ -121,9 +103,6 @@ class Experiment():
 
     @torch.no_grad()
     def _test(self):
-        """_summary_
-            模型测试
-        """
         self.model.eval()
 
         self.pre_label = list()
@@ -132,7 +111,7 @@ class Experiment():
         self.total_test_correct = 0
         self.total_test_loss = 0
 
-        for data, label in tqdm(self.test_dataloader, desc='测试集分析'):
+        for data, label in tqdm(self.test_dataloader, desc='test'):
             data = data.to(self.device)
             label = label.to(self.device)
 
@@ -156,9 +135,6 @@ class Experiment():
             f'test dataset acc:{acc:8.4f}|loss:{loss:8.4f}|auc_roc_score:{score:8.6f}')
 
     def __call__(self) -> None:
-        """_summary_
-            整个模型的训练过程，首先是一轮训练和验证，结束后判断是否早停，并对日志进行记录和保存
-        """
         # self.writer = SummaryWriter(self.tensorboard_dir)
         for epoch in range(self.epochs):
             self._train(epoch=epoch)
@@ -169,15 +145,6 @@ class Experiment():
                 print('early stopping...')
                 break
 
-            # self.writer.add_scalar(
-            #     'loss_epoch/train', self.total_loss/len(self.train_dataset), global_step=epoch)
-            # self.writer.add_scalar(
-            #     'acc_epoch/train', self.total_correct/len(self.train_dataset), global_step=epoch)
-            # self.writer.add_scalar(
-            #     'loss_epoch/eval', self.total_eval_loss/len(self.eval_dataset), global_step=epoch)
-            # self.writer.add_scalar(
-            #     'acc_epoch/eval', self.total_eval_correct/len(self.eval_dataset), global_step=epoch)
-
             file_logger.info(f'{args.architecture if args.use_archi else "all":>10s}|epoch:{epoch:4d}|train_loss:{self.total_loss/len(self.train_dataset):8.4f}|train_acc:{self.total_correct/len(self.train_dataset):8.4f}|eval_loss:{self.total_eval_loss/len(self.eval_dataset):8.4f}|eval_acc:{self.total_eval_correct/len(self.eval_dataset):8.4f}')
 
         # self.writer.close()
@@ -187,14 +154,6 @@ class Experiment():
 
 class ExperimentTest():
     def __init__(self, model: nn.Module, train_dataset, eval_dataset, test_dataset) -> None:
-        """_summary_
-            准备训练用到的dataloader，模型以及优化器，还有一些日志的保存路径
-        Arguments:
-            model -- 待训练的模型
-            train_dataset -- 训练数据集
-            eval_dataset -- 验证数据集
-            test_dataset -- 测试数据集
-        """
         self.train_dataset = train_dataset
         self.eval_dataset = eval_dataset
         self.test_dataset = test_dataset
@@ -239,17 +198,12 @@ class ExperimentTest():
         self.esp = EarlyStopping(self.model, self.save_dir)
 
     def _train(self, epoch):
-        """_summary_
-            训练模型
-        Arguments:
-            epoch -- 第几次训练
-        """
         self.model.train()
 
         self.total_correct = 0
         self.total_loss = 0
 
-        t_bar = tqdm(total=len(self.train_dataloader), desc=f'第{epoch+1}轮训练')
+        t_bar = tqdm(total=len(self.train_dataloader), desc=f'{epoch+1}')
         for data, row_mask, node_mask, label, archi in self.train_dataloader:
             data = data.to(self.device)
             label = label.to(self.device)
@@ -274,16 +228,11 @@ class ExperimentTest():
 
     @torch.no_grad()
     def _eval(self, epoch):
-        """_summary_
-            模型验证
-        Arguments:
-            epoch -- 第几次验证
-        """
         self.model.eval()
 
         self.total_eval_correct = 0
         self.total_eval_loss = 0
-        t_bar = tqdm(total=len(self.eval_dataloader), desc=f'第{epoch+1}轮验证')
+        t_bar = tqdm(total=len(self.eval_dataloader), desc=f'{epoch+1}')
         for data, row_mask, node_mask, label, archi in self.eval_dataloader:
             data = data.to(self.device)
             label = label.to(self.device)
@@ -305,9 +254,6 @@ class ExperimentTest():
 
     @torch.no_grad()
     def _test(self):
-        """_summary_
-            模型测试
-        """
         self.model.eval()
 
         self.pre_label = list()
@@ -316,7 +262,7 @@ class ExperimentTest():
         self.total_test_correct = 0
         self.total_test_loss = 0
 
-        for data, row_mask, node_mask, label, archi in tqdm(self.test_dataloader, desc='测试集分析'):
+        for data, row_mask, node_mask, label, archi in tqdm(self.test_dataloader, desc='test'):
             data = data.to(self.device)
             label = label.to(self.device)
             row_mask = row_mask.to(self.device)
@@ -337,7 +283,7 @@ class ExperimentTest():
 
         self.total_correct = 0
         self.total_loss = 0
-        for data, row_mask, node_mask, label, archi in tqdm(self.train_dataloader,desc='训练集分析'):
+        for data, row_mask, node_mask, label, archi in tqdm(self.train_dataloader,desc='train'):
             data = data.to(self.device)
             label = label.to(self.device)
             row_mask = row_mask.to(self.device)
@@ -353,7 +299,7 @@ class ExperimentTest():
 
         self.total_eval_correct = 0
         self.total_eval_loss = 0
-        for data, row_mask, node_mask, label, archi in tqdm(self.eval_dataloader,desc='验证集分析'):
+        for data, row_mask, node_mask, label, archi in tqdm(self.eval_dataloader,desc='validation'):
             data = data.to(self.device)
             label = label.to(self.device)
             row_mask = row_mask.to(self.device)
@@ -379,9 +325,7 @@ class ExperimentTest():
             f'train_acc:{train_acc:8.4f}|eval_acc={eval_acc:8.4f}|test dataset acc:{acc:8.4f}|loss:{loss:8.4f}|auc_roc_score:{score:8.6f}')
 
     def __call__(self) -> None:
-        """_summary_
-            整个模型的训练过程，首先是一轮训练和验证，结束后判断是否早停，并对日志进行记录和保存
-        """
+        
         # self.writer = SummaryWriter(self.tensorboard_dir)
         for epoch in range(self.epochs):
             self._train(epoch=epoch)
@@ -391,15 +335,6 @@ class ExperimentTest():
             if self.esp.break_now:
                 print('early stopping...')
                 break
-
-            # self.writer.add_scalar(
-            #     'loss_epoch/train', self.total_loss/len(self.train_dataset), global_step=epoch)
-            # self.writer.add_scalar(
-            #     'acc_epoch/train', self.total_correct/len(self.train_dataset), global_step=epoch)
-            # self.writer.add_scalar(
-            #     'loss_epoch/eval', self.total_eval_loss/len(self.eval_dataset), global_step=epoch)
-            # self.writer.add_scalar(
-            #     'acc_epoch/eval', self.total_eval_correct/len(self.eval_dataset), global_step=epoch)
 
             file_logger.info(f'{args.architecture if args.use_archi else "all":>10s}|epoch:{epoch:4d}|train_loss:{self.total_loss/len(self.train_dataset):8.4f}|train_acc:{self.total_correct/len(self.train_dataset):8.4f}|eval_loss:{self.total_eval_loss/len(self.eval_dataset):8.4f}|eval_acc:{self.total_eval_correct/len(self.eval_dataset):8.4f}')
 
@@ -411,14 +346,6 @@ class ExperimentTest():
 
 class ExperimentPosEmbTest():
     def __init__(self, model: nn.Module, train_dataset, eval_dataset, test_dataset) -> None:
-        """_summary_
-            准备训练用到的dataloader，模型以及优化器，还有一些日志的保存路径
-        Arguments:
-            model -- 待训练的模型
-            train_dataset -- 训练数据集
-            eval_dataset -- 验证数据集
-            test_dataset -- 测试数据集
-        """
         self.train_dataset = train_dataset
         self.eval_dataset = eval_dataset
         self.test_dataset = test_dataset
@@ -467,17 +394,12 @@ class ExperimentPosEmbTest():
         self.esp = EarlyStopping(self.model, self.save_dir)
 
     def _train(self, epoch):
-        """_summary_
-            训练模型
-        Arguments:
-            epoch -- 第几次训练
-        """
         self.model.train()
 
         self.total_correct = 0
         self.total_loss = 0
 
-        t_bar = tqdm(total=len(self.train_dataloader), desc=f'第{epoch+1}轮训练')
+        t_bar = tqdm(total=len(self.train_dataloader), desc=f'{epoch+1}')
         for data, row_mask, node_mask, label, archi, pos_emb in self.train_dataloader:
             data = data.to(self.device)
             label = label.to(self.device)
@@ -503,16 +425,11 @@ class ExperimentPosEmbTest():
 
     @torch.no_grad()
     def _eval(self, epoch):
-        """_summary_
-            模型验证
-        Arguments:
-            epoch -- 第几次验证
-        """
         self.model.eval()
 
         self.total_eval_correct = 0
         self.total_eval_loss = 0
-        t_bar = tqdm(total=len(self.eval_dataloader), desc=f'第{epoch+1}轮验证')
+        t_bar = tqdm(total=len(self.eval_dataloader), desc=f'{epoch+1}')
         for data, row_mask, node_mask, label, archi, pos_emb in self.eval_dataloader:
             data = data.to(self.device)
             label = label.to(self.device)
@@ -535,9 +452,6 @@ class ExperimentPosEmbTest():
 
     @torch.no_grad()
     def _test(self):
-        """_summary_
-            模型测试
-        """
         self.model.eval()
 
         self.pre_label = list()
@@ -546,7 +460,7 @@ class ExperimentPosEmbTest():
         self.total_test_correct = 0
         self.total_test_loss = 0
 
-        for data, row_mask, node_mask, label, archi, pos_emb in tqdm(self.test_dataloader, desc='测试集分析'):
+        for data, row_mask, node_mask, label, archi, pos_emb in tqdm(self.test_dataloader, desc='test'):
             data = data.to(self.device)
             label = label.to(self.device)
             row_mask = row_mask.to(self.device)
@@ -568,7 +482,7 @@ class ExperimentPosEmbTest():
 
         self.total_correct = 0
         self.total_loss = 0
-        for data, row_mask, node_mask, label, archi, pos_emb in tqdm(self.train_dataloader,desc='训练集分析'):
+        for data, row_mask, node_mask, label, archi, pos_emb in tqdm(self.train_dataloader,desc='train'):
             data = data.to(self.device)
             label = label.to(self.device)
             row_mask = row_mask.to(self.device)
@@ -585,7 +499,7 @@ class ExperimentPosEmbTest():
 
         self.total_eval_correct = 0
         self.total_eval_loss = 0
-        for data, row_mask, node_mask, label, archi, pos_emb in tqdm(self.eval_dataloader,desc='验证集分析'):
+        for data, row_mask, node_mask, label, archi, pos_emb in tqdm(self.eval_dataloader,desc='validation'):
             data = data.to(self.device)
             label = label.to(self.device)
             row_mask = row_mask.to(self.device)
@@ -612,9 +526,6 @@ class ExperimentPosEmbTest():
             f'train_acc:{train_acc:8.4f}|eval_acc={eval_acc:8.4f}|test dataset acc:{acc:8.4f}|loss:{loss:8.4f}|auc_roc_score:{score:8.6f}')
 
     def __call__(self) -> None:
-        """_summary_
-            整个模型的训练过程，首先是一轮训练和验证，结束后判断是否早停，并对日志进行记录和保存
-        """
         # self.writer = SummaryWriter(self.tensorboard_dir)
         for epoch in range(self.epochs):
             self._train(epoch=epoch)
@@ -649,14 +560,6 @@ except NameError:
 
 class MainExperiment():
     def __init__(self, model: nn.Module, train_dataset, eval_dataset, test_dataset) -> None:
-        """_summary_
-            准备训练用到的dataloader，模型以及优化器，还有一些日志的保存路径
-        Arguments:
-            model -- 待训练的模型
-            train_dataset -- 训练数据集
-            eval_dataset -- 验证数据集
-            test_dataset -- 测试数据集
-        """
         self.train_dataset = train_dataset
         self.eval_dataset = eval_dataset
         self.test_dataset = test_dataset
@@ -672,7 +575,6 @@ class MainExperiment():
         else:
             self.device = torch.device('cpu')
         self.model = model
-        # self.model = model.to(self.device) # 先把模型放到卡上再处理数据，这样可以把卡占住
 
         self.optim = optim.Adam(self.model.parameters(
         ), lr=args.lr, weight_decay=args.weight_decay)
@@ -712,17 +614,12 @@ class MainExperiment():
 
     @profile
     def _train(self, epoch):
-        """_summary_
-            训练模型
-        Arguments:
-            epoch -- 第几次训练
-        """
         self.model.train()
 
         self.total_correct = 0
         self.total_loss = 0
 
-        t_bar = tqdm(total=len(self.train_dataloader), desc=f'第{epoch+1}轮训练')
+        t_bar = tqdm(total=len(self.train_dataloader), desc=f'{epoch+1}')
         for graph, data, row_mask, node_mask, label in self.train_dataloader:
             # data = data.to(self.device)
             # label = label.to(self.device)
@@ -748,16 +645,11 @@ class MainExperiment():
 
     @torch.no_grad()
     def _eval(self, epoch):
-        """_summary_
-            模型验证
-        Arguments:
-            epoch -- 第几次验证
-        """
         self.model.eval()
 
         self.total_eval_correct = 0
         self.total_eval_loss = 0
-        t_bar = tqdm(total=len(self.eval_dataloader), desc=f'第{epoch+1}轮验证')
+        t_bar = tqdm(total=len(self.eval_dataloader), desc=f'{epoch+1}')
         for graph, data, row_mask, node_mask, label in self.eval_dataloader:
             # data = data.to(self.device)
             # label = label.to(self.device)
@@ -780,9 +672,6 @@ class MainExperiment():
 
     @torch.no_grad()
     def _test(self):
-        """_summary_
-            模型测试
-        """
         self.model.eval()
 
         self.pre_label = list()
@@ -791,7 +680,7 @@ class MainExperiment():
         self.total_test_correct = 0
         self.total_test_loss = 0
 
-        for graph, data, row_mask, node_mask, label in tqdm(self.test_dataloader, desc='测试集分析'):
+        for graph, data, row_mask, node_mask, label in tqdm(self.test_dataloader, desc='test'):
             # data = data.to(self.device)
             # label = label.to(self.device)
             # row_mask = row_mask.to(self.device)
@@ -813,7 +702,7 @@ class MainExperiment():
 
         self.total_correct = 0
         self.total_loss = 0
-        for graph, data, row_mask, node_mask, label in tqdm(self.train_dataloader,desc='训练集分析'):
+        for graph, data, row_mask, node_mask, label in tqdm(self.train_dataloader,desc='train'):
             # data = data.to(self.device)
             # label = label.to(self.device)
             # row_mask = row_mask.to(self.device)
@@ -830,7 +719,7 @@ class MainExperiment():
 
         self.total_eval_correct = 0
         self.total_eval_loss = 0
-        for graph, data, row_mask, node_mask, label in tqdm(self.eval_dataloader,desc='验证集分析'):
+        for graph, data, row_mask, node_mask, label in tqdm(self.eval_dataloader,desc='validation'):
             # data = data.to(self.device)
             # label = label.to(self.device)
             # row_mask = row_mask.to(self.device)
@@ -857,9 +746,6 @@ class MainExperiment():
             f'train_acc:{train_acc:8.4f}|eval_acc={eval_acc:8.4f}|test dataset acc:{acc:8.4f}|loss:{loss:8.4f}|auc_roc_score:{score:8.6f}')
 
     def __call__(self) -> None:
-        """_summary_
-            整个模型的训练过程，首先是一轮训练和验证，结束后判断是否早停，并对日志进行记录和保存
-        """
         # self.writer = SummaryWriter(self.tensorboard_dir)
         for epoch in range(self.epochs):
             self._train(epoch=epoch)
@@ -888,14 +774,6 @@ class MainExperiment():
 
 class PosMainExperiment():
     def __init__(self, model: nn.Module, train_dataset, eval_dataset, test_dataset) -> None:
-        """_summary_
-            准备训练用到的dataloader，模型以及优化器，还有一些日志的保存路径
-        Arguments:
-            model -- 待训练的模型
-            train_dataset -- 训练数据集
-            eval_dataset -- 验证数据集
-            test_dataset -- 测试数据集
-        """
         self.train_dataset = train_dataset
         self.eval_dataset = eval_dataset
         self.test_dataset = test_dataset
@@ -946,17 +824,12 @@ class PosMainExperiment():
         self.esp = EarlyStopping(self.model, self.save_dir)
 
     def _train(self, epoch):
-        """_summary_
-            训练模型
-        Arguments:
-            epoch -- 第几次训练
-        """
         self.model.train()
 
         self.total_correct = 0
         self.total_loss = 0
 
-        t_bar = tqdm(total=len(self.train_dataloader), desc=f'第{epoch+1}轮训练')
+        t_bar = tqdm(total=len(self.train_dataloader), desc=f'{epoch+1}')
         for graph, data, row_mask, node_mask, pos_emb, label in self.train_dataloader:
             data = data.to(self.device)
             label = label.to(self.device)
@@ -983,16 +856,11 @@ class PosMainExperiment():
 
     @torch.no_grad()
     def _eval(self, epoch):
-        """_summary_
-            模型验证
-        Arguments:
-            epoch -- 第几次验证
-        """
         self.model.eval()
 
         self.total_eval_correct = 0
         self.total_eval_loss = 0
-        t_bar = tqdm(total=len(self.eval_dataloader), desc=f'第{epoch+1}轮验证')
+        t_bar = tqdm(total=len(self.eval_dataloader), desc=f'{epoch+1}')
         for graph, data, row_mask, node_mask, pos_emb, label in self.eval_dataloader:
             data = data.to(self.device)
             label = label.to(self.device)
@@ -1016,9 +884,6 @@ class PosMainExperiment():
 
     @torch.no_grad()
     def _test(self):
-        """_summary_
-            模型测试
-        """
         self.model.eval()
 
         self.pre_label = list()
@@ -1027,7 +892,7 @@ class PosMainExperiment():
         self.total_test_correct = 0
         self.total_test_loss = 0
 
-        for graph, data, row_mask, node_mask, pos_emb, label in tqdm(self.test_dataloader, desc='测试集分析'):
+        for graph, data, row_mask, node_mask, pos_emb, label in tqdm(self.test_dataloader, desc='test'):
             data = data.to(self.device)
             label = label.to(self.device)
             row_mask = row_mask.to(self.device)
@@ -1050,7 +915,7 @@ class PosMainExperiment():
 
         self.total_correct = 0
         self.total_loss = 0
-        for graph, data, row_mask, node_mask, pos_emb, label in tqdm(self.train_dataloader,desc='训练集分析'):
+        for graph, data, row_mask, node_mask, pos_emb, label in tqdm(self.train_dataloader,desc='train'):
             data = data.to(self.device)
             label = label.to(self.device)
             row_mask = row_mask.to(self.device)
@@ -1068,7 +933,7 @@ class PosMainExperiment():
 
         self.total_eval_correct = 0
         self.total_eval_loss = 0
-        for graph, data, row_mask, node_mask, pos_emb, label in tqdm(self.eval_dataloader,desc='验证集分析'):
+        for graph, data, row_mask, node_mask, pos_emb, label in tqdm(self.eval_dataloader,desc='validation'):
             data = data.to(self.device)
             label = label.to(self.device)
             row_mask = row_mask.to(self.device)
@@ -1096,9 +961,6 @@ class PosMainExperiment():
             f'train_acc:{train_acc:8.4f}|eval_acc={eval_acc:8.4f}|test dataset acc:{acc:8.4f}|loss:{loss:8.4f}|auc_roc_score:{score:8.6f}')
 
     def __call__(self) -> None:
-        """_summary_
-            整个模型的训练过程，首先是一轮训练和验证，结束后判断是否早停，并对日志进行记录和保存
-        """
         # self.writer = SummaryWriter(self.tensorboard_dir)
         for epoch in range(self.epochs):
             self._train(epoch=epoch)

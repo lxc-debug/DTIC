@@ -36,7 +36,6 @@ class Aggregator(nn.Module, ABC):
 
         if mask is not None:
             # print(scores.shape,mask.shape)
-            # todo 一会这里打个断点，看mask是不是有问题
             scores = scores.masked_fill(mask == 0, -1e20)
 
         attn = fn.softmax(scores, dim=-1)
@@ -50,7 +49,6 @@ class Aggregator(nn.Module, ABC):
                 if layer.bias is not None:
                     nn.init.constant_(layer.bias, 0)
 
-# todo: 这里考虑一下，感觉参数和节点的聚合器既然已经分开写了那就直接把size去掉就行了，维度就是(1,1,1,feature_size) (这个已经实现了，考虑结束后把size去掉，并且根据聚合器的不同给定了q的维度)
 
 
 class ParameterAggregator(Aggregator):
@@ -155,14 +153,12 @@ class ParameterSparseAggregator(Aggregator):
         # return self.ffn(x)+x
         return self.dense(x)
 
-
-# todo: 这个后面还要写一下聚合node的版本，还有后续还要解决一下graph的聚合的维度问题 (好像已经完成了)
 class NodeAggregator(Aggregator):
     def __init__(self) -> None:
         super().__init__()
         if args.use_q_node:
             self._q = nn.Parameter(torch.randn(
-                (args.batch_size, 1, args.hidden_dim)), requires_grad=True)  # 这里就算用自注意力为了保持一致还是应该用batch_size大小的矩阵
+                (args.batch_size, 1, args.hidden_dim)), requires_grad=True)  
         else:
             self._q = nn.Parameter(torch.randn(
                 (1, 1, args.hidden_dim)), requires_grad=False)
@@ -242,19 +238,7 @@ class StructureExtractor(nn.Module):
         
         graph_data.ndata['struct_feature']=x
 
-        # 准备使用dgl给出的方法进行聚合来降维，下面的是使用self_attention的方式来降维
-        # batch_num_nodes = graph_data.batch_num_nodes()
-        # cumsum = torch.cumsum(torch.tensor(
-        #     [0] + batch_num_nodes.tolist()), dim=0)
-
-        # features_list = list()
-        # for i in range(len(batch_num_nodes)):  # 拆分大图，用于后面的特征降维
-        #     start_idx = cumsum[i]
-        #     end_idx = cumsum[i + 1]
-        #     subgraph_features = graph_data.ndata['feature'][start_idx:end_idx]
-        #     features_list.append(subgraph_features)
-
-        # features = torch.FloatTensor(features_list)
+        
         return graph_data
 
 class GraphStructureAggregator(nn.Module):
@@ -324,9 +308,6 @@ try:
 except NameError:
     def profile(func):
         return func
-
-# todo:后面还要确定一下图节点的参数的维度，在gin的输入维度处填写，这里先随便填了一个不存在的args的参数
-# todo:这里还有一个问题就是我把图神经网络只放了两层，后续如果要调这个超参的话，可以加一个args的参数
 class MainModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -351,22 +332,21 @@ class MainModel(nn.Module):
     @profile
     def forward(self, dgl_graph, par_tensor, row_mask=None, node_mask=None, name=None):
         # test = self.par_test(par_tensor)
-        par_feature = self.par_dense(par_tensor)  # 改变参数维度到hidden_dim
-        archi_feature = self.structure_aggregator(dgl_graph)   # 改变结构参数维度到hidden_dim
-        archi_feature = torch.unsqueeze(archi_feature, dim=1)  # 扩充第二维用于作为query
-        # print(archi_feature.shape)
+        par_feature = self.par_dense(par_tensor)  
+        archi_feature = self.structure_aggregator(dgl_graph)   
+        archi_feature = torch.unsqueeze(archi_feature, dim=1)  
 
         par_feature = self.parameter_aggregator(
-            par_feature, mask=row_mask)  # 聚合row_size
+            par_feature, mask=row_mask)  
 
         # par_feature=torch.max(par_feature,dim=-2)[0]
         
         # print(par_feature.shape)
         if args.use_q_node:
-            self.node_aggregator.parameter=archi_feature   # 设置query
+            self.node_aggregator.parameter=archi_feature   
         
         node_feature, node_attention = self.node_aggregator(
-            par_feature, mask=node_mask)  # 聚合node_size
+            par_feature, mask=node_mask)  
 
         # feature=torch.concat([node_feature,torch.squeeze(archi_feature)],dim=-1)
 
@@ -400,25 +380,24 @@ class MainSparseModel(nn.Module):
     def forward(self, dgl_graph, par_tensor, row_mask=None, node_mask=None, name=None):
         data_res, node_size_li=par_tensor
 
-        par_feature = self.par_dense(data_res)  # 改变参数维度到hidden_dim
-        archi_feature = self.structure_aggregator(dgl_graph)   # 改变结构参数维度到hidden_dim
-        archi_feature = torch.unsqueeze(archi_feature, dim=1)  # 扩充第二维用于作为query
-        # print(archi_feature.shape)
+        par_feature = self.par_dense(data_res)  
+        archi_feature = self.structure_aggregator(dgl_graph)   
+        archi_feature = torch.unsqueeze(archi_feature, dim=1)  
 
         par_feature = self.parameter_aggregator(
-            par_feature, mask=row_mask)  # 聚合row_size
+            par_feature, mask=row_mask)  
 
         # par_feature=torch.max(par_feature,dim=-2)[0]
         
         # print(par_feature.shape)
         if args.use_q_node:
-            self.node_aggregator.parameter=archi_feature   # 设置query
+            self.node_aggregator.parameter=archi_feature   
         
         par_feature_li = torch.split(par_feature,node_size_li)
         par_feature = torch.nn.utils.rnn.pad_sequence(par_feature_li,batch_first=True)
 
         node_feature, attn = self.node_aggregator(
-            par_feature, mask=node_mask)  # 聚合node_size
+            par_feature, mask=node_mask)  
 
         # feature=torch.concat([node_feature,torch.squeeze(archi_feature)],dim=-1)
 
@@ -448,23 +427,22 @@ class PosMainModel(nn.Module):
         )
 
     def forward(self, dgl_graph, par_tensor, row_mask=None, node_mask=None, pos_emb=None):
-        par_feature = self.par_dense(par_tensor)  # 改变参数维度到hidden_dim
-        archi_feature = self.structure_aggregator(dgl_graph)   # 改变结构参数维度到hidden_dim
-        archi_feature = torch.unsqueeze(archi_feature, dim=1)  # 扩充第二维用于作为query
-        # print(archi_feature.shape)
+        par_feature = self.par_dense(par_tensor)  
+        archi_feature = self.structure_aggregator(dgl_graph)
+        archi_feature = torch.unsqueeze(archi_feature, dim=1)
 
         par_feature = self.parameter_aggregator(
-            par_feature, mask=row_mask)  # 聚合row_size
+            par_feature, mask=row_mask)
         
         # print(par_feature.shape)
         if args.use_q_node:
-            self.node_aggregator.parameter=archi_feature   # 设置query
+            self.node_aggregator.parameter=archi_feature
         
         par_feature=pos_emb+par_feature
         # par_feature=torch.concat((pos_emb,par_feature),dim=-1)
 
         node_feature = self.node_aggregator(
-            par_feature, mask=node_mask)  # 聚合node_size
+            par_feature, mask=node_mask)
 
         # print(node_feature.shape)
         res=self.classifier(node_feature)
@@ -491,20 +469,19 @@ class ModelTestNodeAggregate(nn.Module):
         )
 
     def forward(self, data, archi_feature, row_mask=None, node_mask=None):
-        par_feature = self.par_dense(data)  # 改变参数维度到hidden_dim
-        archi_feature = self.archi_dense(archi_feature)   # 改变结构参数维度到hidden_dim
-        archi_feature = torch.unsqueeze(archi_feature, dim=1)  # 扩充第二维用于作为query
-        # print(archi_feature.shape)
+        par_feature = self.par_dense(data)  
+        archi_feature = self.archi_dense(archi_feature) 
+        archi_feature = torch.unsqueeze(archi_feature, dim=1)
 
         par_feature = self.parameter_aggregator(
-            par_feature, mask=row_mask)  # 聚合row_size
+            par_feature, mask=row_mask)
         
         # print(par_feature.shape)
         if args.use_q_node:
-            self.node_aggregator.parameter=archi_feature   # 设置query
+            self.node_aggregator.parameter=archi_feature
         
         node_feature = self.node_aggregator(
-            par_feature, mask=node_mask)  # 聚合node_size
+            par_feature, mask=node_mask)
 
         # print(node_feature.shape)
         res=self.classifier(node_feature)
@@ -532,23 +509,22 @@ class ModelTestNodePosEmbAggregate(nn.Module):
         )
 
     def forward(self, data, archi_feature, row_mask=None, node_mask=None, pos_emb=None):
-        par_feature = self.par_dense(data)  # 改变参数维度到hidden_dim
-        archi_feature = self.archi_dense(archi_feature)   # 改变结构参数维度到hidden_dim
-        archi_feature = torch.unsqueeze(archi_feature, dim=1)  # 扩充第二维用于作为query
-        # print(archi_feature.shape)
+        par_feature = self.par_dense(data)
+        archi_feature = self.archi_dense(archi_feature)
+        archi_feature = torch.unsqueeze(archi_feature, dim=1)
 
         par_feature = self.parameter_aggregator(
-            par_feature, mask=row_mask)  # 聚合row_size
+            par_feature, mask=row_mask)
         
         # print(par_feature.shape)
         if args.use_q_node:
-            self.node_aggregator.parameter=archi_feature   # 设置query
+            self.node_aggregator.parameter=archi_feature
         
         par_feature=torch.concat((pos_emb,par_feature),dim=-1)
 
 
         node_feature = self.node_aggregator(
-            par_feature, mask=node_mask)  # 聚合node_size
+            par_feature, mask=node_mask)
 
         # print(node_feature.shape)
         res=self.classifier(node_feature)

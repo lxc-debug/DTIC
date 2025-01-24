@@ -33,7 +33,7 @@ class BaseDataset(Dataset):
 
         for dir in dir_list:
             names = glob(os.path.join(dir, '*.pt'))
-            for name in tqdm(names, desc=f'将{dir.split("/")[-1]}中的模型转换为onnx'):
+            for name in tqdm(names, desc=f'{dir.split("/")[-1]} to onnx'):
                 model2onnx(model, name, input_tensor, os.path.join(
                     self.save_dir, 'input', self.mode))
                 
@@ -48,7 +48,7 @@ class BaseDataset(Dataset):
 
         for dir in dir_list:
             names = glob(os.path.join(dir, '*.pt'))
-            for name in tqdm(names, desc=f'将{dir.split("/")[-1]}中的模型转换为onnx'):
+            for name in tqdm(names, desc=f'{dir.split("/")[-1]} to onnx'):
                 model2onnx(model, name, input_tensor, os.path.join(
                     self.save_dir, 'bpp', self.mode))
 
@@ -64,58 +64,12 @@ class BaseDataset(Dataset):
 
         for dir in dir_list:
             names = glob(os.path.join(dir, '*.pt'))
-            for name in tqdm(names, desc=f'将{dir.split("/")[-1]}中的模型转换为onnx'):
+            for name in tqdm(names, desc=f'{dir.split("/")[-1]} to onnx'):
                 model2onnx(model, name, input_tensor, os.path.join(
                     self.save_dir, 'wanet', self.mode))
 
-    def _trans_vgg_model(self):
-        """_summary_
-            读入vgg模型，转为onnx
-        """
-        model = CNN_classifier()
-        input_tensor = torch.randn(1, 3, 32, 32)
-
-        if self.mode == 'train':
-            dir_list = args.vgg_train_data_dir
-        elif self.mode == 'eval':
-            dir_list = args.vgg_eval_data_dir
-        elif self.mode == 'test':
-            dir_list = args.vgg_test_data_dir
-        else:
-            raise ValueError('mode must be train or eval or test')
-
-        for dir in dir_list:
-            names = glob(os.path.join(dir, '*.pt'))
-            for name in tqdm(names, desc=f'将{dir.split("/")[-1]}中的模型转换为onnx'):
-                model2onnx(model, name, input_tensor, os.path.join(
-                    self.save_dir, 'vgg', self.mode))
-
-    def _trans_resnet_model(self):
-        """_summary_
-            读入resnet模型，转为onnx
-        """
-        model = resnet18_mod(num_classes=200)  # tiny_image的大小
-        input_tensor = torch.randn(1, 3, 32, 32)
-
-        if self.mode == 'train':
-            dir_list = args.resnet_train_data_dir
-        elif self.mode == 'eval':
-            dir_list = args.resnet_eval_data_dir
-        elif self.mode == 'test':
-            dir_list = args.resnet_test_data_dir
-        else:
-            raise ValueError('mode must be train or eval or test')
-
-        for dir in dir_list:
-            names = glob(os.path.join(dir, '*.pt'))
-            for name in tqdm(names, desc=f'将{dir.split("/")[-1]}中的模型转换为onnx'):
-                model2onnx(model, name, input_tensor, os.path.join(
-                    self.save_dir, 'resnet', self.mode))
 
     def _trans_leader_one_model(self):
-        """_summary_
-            读入leader_one模型，转为onnx
-        """
         model = None
         input_tensor = torch.randn(1, 3, 224, 224)
 
@@ -130,14 +84,11 @@ class BaseDataset(Dataset):
 
         for dir in dir_list:
             names = glob(os.path.join(dir, '*.pt'))
-            for name in tqdm(names, desc=f'将{dir.split("/")[-1]}中的模型转换为onnx'):
+            for name in tqdm(names, desc=f'{dir.split("/")[-1]} to onnx'):
                 model2onnx(model, name, input_tensor, os.path.join(
                     self.save_dir, 'leader_one', self.mode))
 
     def _trans_leader_two_model(self):
-        """_summary_
-            读入leader_two模型，转为onnx
-        """
         model = None
         input_tensor = torch.randn(1, 3, 224, 224)
 
@@ -152,14 +103,11 @@ class BaseDataset(Dataset):
 
         for dir in dir_list:
             names = glob(os.path.join(dir, '*.pt'))
-            for name in tqdm(names, desc=f'将{dir.split("/")[-1]}中的模型转换为onnx'):
+            for name in tqdm(names, desc=f'{dir.split("/")[-1]} to onnx'):
                 model2onnx(model, name, input_tensor, os.path.join(
                     self.save_dir, 'leader_two', self.mode))
                 
     def _trans_leader_three_model(self):
-        """_summary_
-            读入leader_three模型，转为onnx
-        """
         model = None
         input_tensor = torch.randn(1, 3, 224, 224)
 
@@ -174,41 +122,14 @@ class BaseDataset(Dataset):
 
         for dir in dir_list:
             names = glob(os.path.join(dir, '*.pt'))
-            for name in tqdm(names, desc=f'将{dir.split("/")[-1]}中的模型转换为onnx'):
+            for name in tqdm(names, desc=f'{dir.split("/")[-1]} to onnx'):
                 model2onnx(model, name, input_tensor, os.path.join(
                     self.save_dir, 'leader_three', self.mode))
                 
 
-    def _trans_leader_four_model(self):
-        """_summary_
-            读入leader_four模型，转为onnx
-        """
-        model = None
-        input_tensor = torch.randn(1, 3, 224, 224)
-
-        if self.mode == 'train':
-            dir_list = args.leaderfour_train_data_dir
-        elif self.mode == 'eval':
-            dir_list = args.leaderfour_eval_data_dir
-        elif self.mode == 'test':
-            dir_list = args.leaderfour_test_data_dir
-        else:
-            raise ValueError('mode must be train or eval or test')
-
-        for dir in dir_list:
-            names = glob(os.path.join(dir, '*.pt'))
-            for name in tqdm(names, desc=f'将{dir.split("/")[-1]}中的模型转换为onnx'):
-                model2onnx(model, name, input_tensor, os.path.join(
-                    self.save_dir, 'leader_four', self.mode))
-
 
 class MyDataset(BaseDataset):
     def __init__(self, mode='train') -> None:
-        """_summary_
-            构建数据集，首先判断是否要调用模型转为onnx的函数，接下来判断是否处理过的数据是否保存了，如果已经存在直接读取就行，否则就使用onnx转张量的函数来进行数据处理。最终数据存储到self.data中，标签存放在self.label中
-        Keyword Arguments:
-            mode -- 要读取哪个数据集的数据，train，eval，test (default: {'train'})
-        """
         super().__init__()
         self.data = list()
         self.label = list()
@@ -222,10 +143,6 @@ class MyDataset(BaseDataset):
                     self._trans_leader_one_model()
                 elif model_use == 'leader_two':
                     self._trans_leader_two_model()
-                if model_use == 'vgg':
-                    self._trans_vgg_model()
-                if model_use == 'resnet':
-                    self._trans_resnet_model()
 
         file_name = '+'.join(self.use_list)
         save_path = os.path.join(args.data_save, file_name, self.mode)
@@ -240,13 +157,13 @@ class MyDataset(BaseDataset):
 
                 model_paths = glob(model_paths)
 
-                for model_path in tqdm(model_paths, desc=f'正在从{model_use}的{self.mode}的结构{args.architecture if args.use_archi else "all"}:onnx数据导入dataset'):
+                for model_path in tqdm(model_paths, desc=f'{model_use}:{self.mode}{args.architecture if args.use_archi else "all"}:dataset'):
                     if 'clean' in re.split(r'\.|/|_', model_path):
                         is_poisoned = 0
                     elif 'poisoned' in re.split(r'\.|/|_', model_path):
                         is_poisoned = 1
                     else:
-                        raise NameError(f'文件命名错误,当前文件路径:{model_path}')
+                        raise NameError(f'file_path:{model_path}')
 
                     data = onnx2dgl(model_path)
 
@@ -265,24 +182,13 @@ class MyDataset(BaseDataset):
             if not os.path.exists(save_path):
                 raise ValueError('file not exists please process data')
 
-            logger.info(f'载入{self.mode}数据')
+            logger.info(f'load {self.mode}')
             self._load(save_path)
 
-    # 已经完成数据读取，后面再接着写就行
     def _load(self, save_path):
-        """_summary_
-            直接读入数据
-        Arguments:
-            save_path -- 数据存储的位置
-        """
         self.data, self.label = torch.load(save_path)
 
     def _save(self, save_path):
-        """_summary_
-            保存已经处理好的数据
-        Arguments:
-            save_path -- 数据保存的位置
-        """
         if args.use_archi:
             save_path = os.path.join(
                 save_path, args.architecture, 'data.ds')
@@ -301,14 +207,6 @@ class MyDataset(BaseDataset):
 
     @staticmethod
     def coll_fn(batch):
-        """_summary_
-            因为leadertwo中最后一层的数据的row_size不一定相同，这里就是在读入数据的时候，把row_size给padding到这个batch中的最大值
-        Arguments:
-            batch -- 从数据流中获取到的一个batch的数据
-
-        Returns:
-            返回一个batch的数据以及batch格式的标签
-        """
         max_len = max(batch, key=lambda x: x[0].shape[0])[0].shape[0]
 
         data_li = list()
@@ -325,11 +223,6 @@ class MyDataset(BaseDataset):
 
 class TestDataset(BaseDataset):
     def __init__(self, mode='train') -> None:
-        """_summary_
-            构建数据集，首先判断是否要调用模型转为onnx的函数，接下来判断是否处理过的数据是否保存了，如果已经存在直接读取就行，否则就使用onnx转张量的函数来进行数据处理。最终数据存储到self.data中，标签存放在self.label中
-        Keyword Arguments:
-            mode -- 要读取哪个数据集的数据，train，eval，test (default: {'train'})
-        """
         super().__init__()
         self.data = list()
         self.label = list()
@@ -346,10 +239,6 @@ class TestDataset(BaseDataset):
                     self._trans_leader_one_model()
                 elif model_use == 'leader_two':
                     self._trans_leader_two_model()
-                if model_use == 'vgg':
-                    self._trans_vgg_model()
-                if model_use == 'resnet':
-                    self._trans_resnet_model()
 
         file_name = '+'.join(self.use_list)
         save_path = os.path.join(args.data_save, file_name, self.mode)
@@ -364,13 +253,13 @@ class TestDataset(BaseDataset):
 
                 model_paths = glob(model_paths)
 
-                for model_path in tqdm(model_paths, desc=f'正在从{model_use}的{self.mode}的结构{args.architecture if args.use_archi else "all"}:onnx数据导入dataset'):
+                for model_path in tqdm(model_paths, desc=f''):
                     if 'clean' in re.split(r'\.|/|_', model_path):
                         is_poisoned = 0
                     elif 'poisoned' in re.split(r'\.|/|_', model_path):
                         is_poisoned = 1
                     else:
-                        raise NameError(f'文件命名错误,当前文件路径:{model_path}')
+                        raise NameError(f'{model_path}')
 
                     data_res = onnx2dgltest(model_path)
 
@@ -397,25 +286,14 @@ class TestDataset(BaseDataset):
             if not os.path.exists(save_path):
                 raise ValueError('file not exists please process data')
 
-            logger.info(f'载入{self.mode}数据')
+            logger.info(f'{self.mode}')
             self._load(save_path)
 
-    # 已经完成数据读取，后面再接着写就行
     def _load(self, save_path):
-        """_summary_
-            直接读入数据
-        Arguments:
-            save_path -- 数据存储的位置
-        """
         self.data, self.row_mask, self.node_mask, self.label, self.archi = torch.load(
             save_path)
 
     def _save(self, save_path):
-        """_summary_
-            保存已经处理好的数据
-        Arguments:
-            save_path -- 数据保存的位置
-        """
         if args.use_base:
             file_name='base_data.ds'
         else :
@@ -468,11 +346,6 @@ class TestDataset(BaseDataset):
 
 class PosEmbTestDataset(BaseDataset):
     def __init__(self, mode='train') -> None:
-        """_summary_
-            构建数据集，首先判断是否要调用模型转为onnx的函数，接下来判断是否处理过的数据是否保存了，如果已经存在直接读取就行，否则就使用onnx转张量的函数来进行数据处理。最终数据存储到self.data中，标签存放在self.label中
-        Keyword Arguments:
-            mode -- 要读取哪个数据集的数据，train，eval，test (default: {'train'})
-        """
         super().__init__()
         self.data = list()
         self.label = list()
@@ -490,10 +363,6 @@ class PosEmbTestDataset(BaseDataset):
                     self._trans_leader_one_model()
                 elif model_use == 'leader_two':
                     self._trans_leader_two_model()
-                if model_use == 'vgg':
-                    self._trans_vgg_model()
-                if model_use == 'resnet':
-                    self._trans_resnet_model()
 
         file_name = '+'.join(self.use_list)
         save_path = os.path.join(args.data_save, file_name, self.mode)
@@ -508,13 +377,13 @@ class PosEmbTestDataset(BaseDataset):
 
                 model_paths = glob(model_paths)
 
-                for model_path in tqdm(model_paths, desc=f'正在从{model_use}的{self.mode}的结构{args.architecture if args.use_archi else "all"}:onnx数据导入dataset'):
+                for model_path in tqdm(model_paths, desc=f''):
                     if 'clean' in re.split(r'\.|/|_', model_path):
                         is_poisoned = 0
                     elif 'poisoned' in re.split(r'\.|/|_', model_path):
                         is_poisoned = 1
                     else:
-                        raise NameError(f'文件命名错误,当前文件路径:{model_path}')
+                        raise NameError(f'{model_path}')
 
                     data_res = onnx2dgl_posemb_test(model_path)
 
@@ -541,25 +410,14 @@ class PosEmbTestDataset(BaseDataset):
             if not os.path.exists(save_path):
                 raise ValueError('file not exists please process data')
 
-            logger.info(f'载入{self.mode}数据')
+            logger.info(f'{self.mode}')
             self._load(save_path)
 
-    # 已经完成数据读取，后面再接着写就行
     def _load(self, save_path):
-        """_summary_
-            直接读入数据
-        Arguments:
-            save_path -- 数据存储的位置
-        """
         self.data, self.row_mask, self.node_mask, self.label, self.archi, self.pos_emb = torch.load(
             save_path)
 
     def _save(self, save_path):
-        """_summary_
-            保存已经处理好的数据
-        Arguments:
-            save_path -- 数据保存的位置
-        """
         if args.use_base:
             file_name='base_data.ds'
         else :
@@ -612,11 +470,6 @@ class PosEmbTestDataset(BaseDataset):
 
 class MainDataset(BaseDataset):
     def __init__(self, mode='train') -> None:
-        """_summary_
-            构建数据集，首先判断是否要调用模型转为onnx的函数，接下来判断是否处理过的数据是否保存了，如果已经存在直接读取就行，否则就使用onnx转张量的函数来进行数据处理。最终数据存储到self.data中，标签存放在self.label中
-        Keyword Arguments:
-            mode -- 要读取哪个数据集的数据，train，eval，test (default: {'train'})
-        """
         super().__init__()
         self.data = list()
         self.label = list()
@@ -637,12 +490,6 @@ class MainDataset(BaseDataset):
                     self._trans_leader_two_model()
                 elif model_use == 'leader_three':
                     self._trans_leader_three_model()
-                elif model_use == 'leader_four':
-                    self._trans_leader_four_model()
-                elif model_use == 'vgg':
-                    self._trans_vgg_model()
-                elif model_use == 'resnet':
-                    self._trans_resnet_model()
                 elif model_use == 'wanet':
                     self._trans_wanet_model()
                 elif model_use == 'bpp':
@@ -663,13 +510,13 @@ class MainDataset(BaseDataset):
 
                 model_paths = glob(model_paths)
 
-                for model_path in tqdm(model_paths, desc=f'正在从{model_use}的{self.mode}的结构{args.architecture if args.use_archi else "all"}:onnx数据导入dataset'):
+                for model_path in tqdm(model_paths, desc=f''):
                     if 'clean' in re.split(r'\.|/|_', model_path):
                         is_poisoned = 0
                     elif 'poisoned' in re.split(r'\.|/|_', model_path):
                         is_poisoned = 1
                     else:
-                        raise NameError(f'文件命名错误,当前文件路径:{model_path}')
+                        raise NameError(f'{model_path}')
 
                     data_res = onnx2dgl2(model_path)
 
@@ -685,16 +532,10 @@ class MainDataset(BaseDataset):
             # pass
 
         else:  # load
-            logger.info(f'载入{self.mode}数据')
+            logger.info(f'{self.mode}')
             self._load(save_path)
 
-    # 已经完成数据读取，后面再接着写就行
     def _load(self, save_path):
-        """_summary_
-            直接读入数据
-        Arguments:
-            save_path -- 数据存储的位置
-        """
 
         if args.use_base:
             file_name='base_data.ds'
@@ -729,11 +570,6 @@ class MainDataset(BaseDataset):
 
 
     def _save(self, save_path):
-        """_summary_
-            保存已经处理好的数据
-        Arguments:
-            save_path -- 数据保存的位置
-        """
         if args.use_base:
             file_name='base_data.ds'
         else :
@@ -798,11 +634,6 @@ class MainDataset(BaseDataset):
 
 class AugmentMainDataset(BaseDataset):
     def __init__(self, mode='train') -> None:
-        """_summary_
-            构建数据集，首先判断是否要调用模型转为onnx的函数，接下来判断是否处理过的数据是否保存了，如果已经存在直接读取就行，否则就使用onnx转张量的函数来进行数据处理。最终数据存储到self.data中，标签存放在self.label中
-        Keyword Arguments:
-            mode -- 要读取哪个数据集的数据，train，eval，test (default: {'train'})
-        """
         super().__init__()
         self.data = list()
         self.label = list()
@@ -822,12 +653,6 @@ class AugmentMainDataset(BaseDataset):
                     self._trans_leader_two_model()
                 elif model_use == 'leader_three':
                     self._trans_leader_three_model()
-                elif model_use == 'leader_four':
-                    self._trans_leader_four_model()
-                elif model_use == 'vgg':
-                    self._trans_vgg_model()
-                elif model_use == 'resnet':
-                    self._trans_resnet_model()
 
         file_name = '+'.join(self.use_list)
         save_path = os.path.join(args.data_save, file_name, self.mode)
@@ -842,13 +667,13 @@ class AugmentMainDataset(BaseDataset):
 
                 model_paths = glob(model_paths)
 
-                for model_path in tqdm(model_paths, desc=f'正在从{model_use}的{self.mode}的结构{args.architecture if args.use_archi else "all"}:onnx数据导入dataset'):
+                for model_path in tqdm(model_paths, desc=f''):
                     if 'clean' in re.split(r'\.|/|_', model_path):
                         is_poisoned = 0
                     elif 'poisoned' in re.split(r'\.|/|_', model_path):
                         is_poisoned = 1
                     else:
-                        raise NameError(f'文件命名错误,当前文件路径:{model_path}')
+                        raise NameError(f'{model_path}')
                     
                     if self.mode=='train':
                         for _ in range(3):
@@ -874,16 +699,10 @@ class AugmentMainDataset(BaseDataset):
             # pass
 
         else:  # load
-            logger.info(f'载入{self.mode}数据')
+            logger.info(f'{self.mode}')
             self._load(save_path)
 
-    # 已经完成数据读取，后面再接着写就行
     def _load(self, save_path):
-        """_summary_
-            直接读入数据
-        Arguments:
-            save_path -- 数据存储的位置
-        """
 
         if args.use_base:
             file_name='base_data.ds'
@@ -918,11 +737,6 @@ class AugmentMainDataset(BaseDataset):
 
 
     def _save(self, save_path):
-        """_summary_
-            保存已经处理好的数据
-        Arguments:
-            save_path -- 数据保存的位置
-        """
         if args.use_base:
             file_name='base_data.ds'
         else :
@@ -985,11 +799,6 @@ class AugmentMainDataset(BaseDataset):
 
 class PosMainDataset(BaseDataset):
     def __init__(self, mode='train') -> None:
-        """_summary_
-            构建数据集，首先判断是否要调用模型转为onnx的函数，接下来判断是否处理过的数据是否保存了，如果已经存在直接读取就行，否则就使用onnx转张量的函数来进行数据处理。最终数据存储到self.data中，标签存放在self.label中
-        Keyword Arguments:
-            mode -- 要读取哪个数据集的数据，train，eval，test (default: {'train'})
-        """
         super().__init__()
         self.data = list()
         self.label = list()
@@ -1009,12 +818,6 @@ class PosMainDataset(BaseDataset):
                     self._trans_leader_two_model()
                 elif model_use == 'leader_three':
                     self._trans_leader_three_model()
-                elif model_use == 'leader_four':
-                    self._trans_leader_four_model()
-                elif model_use == 'vgg':
-                    self._trans_vgg_model()
-                elif model_use == 'resnet':
-                    self._trans_resnet_model()
 
         file_name = '+'.join(self.use_list)
         save_path = os.path.join(args.data_save, file_name, self.mode)
@@ -1029,13 +832,13 @@ class PosMainDataset(BaseDataset):
 
                 model_paths = glob(model_paths)
 
-                for model_path in tqdm(model_paths, desc=f'正在从{model_use}的{self.mode}的结构{args.architecture if args.use_archi else "all"}:onnx数据导入dataset'):
+                for model_path in tqdm(model_paths, desc=f''):
                     if 'clean' in re.split(r'\.|/|_', model_path):
                         is_poisoned = 0
                     elif 'poisoned' in re.split(r'\.|/|_', model_path):
                         is_poisoned = 1
                     else:
-                        raise NameError(f'文件命名错误,当前文件路径:{model_path}')
+                        raise NameError(f'{model_path}')
 
                     data_res = onnx2dgl_pos_main(model_path)
 
@@ -1050,16 +853,10 @@ class PosMainDataset(BaseDataset):
             # pass
 
         else:  # load
-            logger.info(f'载入{self.mode}数据')
+            logger.info(f'{self.mode}')
             self._load(save_path)
 
-    # 已经完成数据读取，后面再接着写就行
     def _load(self, save_path):
-        """_summary_
-            直接读入数据
-        Arguments:
-            save_path -- 数据存储的位置
-        """
 
         if args.use_base:
             file_name='base_data.ds'
@@ -1095,11 +892,6 @@ class PosMainDataset(BaseDataset):
 
 
     def _save(self, save_path):
-        """_summary_
-            保存已经处理好的数据
-        Arguments:
-            save_path -- 数据保存的位置
-        """
         if args.use_base:
             file_name='base_data.ds'
         else :
@@ -1172,11 +964,6 @@ except NameError:
 class AugmentOriMainDataset(BaseDataset):
     @profile
     def __init__(self, mode='train') -> None:
-        """_summary_
-            构建数据集，首先判断是否要调用模型转为onnx的函数，接下来判断是否处理过的数据是否保存了，如果已经存在直接读取就行，否则就使用onnx转张量的函数来进行数据处理。最终数据存储到self.data中，标签存放在self.label中
-        Keyword Arguments:
-            mode -- 要读取哪个数据集的数据，train，eval，test (default: {'train'})
-        """
         super().__init__()
         self.data = list()
         self.label = list()
@@ -1197,12 +984,6 @@ class AugmentOriMainDataset(BaseDataset):
                     self._trans_leader_two_model()
                 elif model_use == 'leader_three':
                     self._trans_leader_three_model()
-                elif model_use == 'leader_four':
-                    self._trans_leader_four_model()
-                elif model_use == 'vgg':
-                    self._trans_vgg_model()
-                elif model_use == 'resnet':
-                    self._trans_resnet_model()
                 elif model_use == 'wanet':
                     self._trans_wanet_model()
                 elif model_use == 'bpp':
@@ -1223,13 +1004,13 @@ class AugmentOriMainDataset(BaseDataset):
 
                 model_paths = glob(model_paths)
 
-                for model_path in tqdm(model_paths, desc=f'正在从{model_use}的{self.mode}的结构{args.architecture if args.use_archi else "all"}:onnx数据导入dataset'):
+                for model_path in tqdm(model_paths, desc=f''):
                     if 'clean' in re.split(r'\.|/|_', model_path):
                         is_poisoned = 0
                     elif 'poisoned' in re.split(r'\.|/|_', model_path):
                         is_poisoned = 1
                     else:
-                        raise NameError(f'文件命名错误,当前文件路径:{model_path}')
+                        raise NameError(f'{model_path}')
                     
                     if self.mode=='train':
                         for idx in range(args.aug_level):
@@ -1257,16 +1038,10 @@ class AugmentOriMainDataset(BaseDataset):
             # pass
 
         else:  # load
-            logger.info(f'载入{self.mode}数据')
+            logger.info(f'{self.mode}')
             self._load(save_path)
 
-    # 已经完成数据读取，后面再接着写就行
     def _load(self, save_path):
-        """_summary_
-            直接读入数据
-        Arguments:
-            save_path -- 数据存储的位置
-        """
 
         if args.use_base:
             file_name='base_data.ds'
@@ -1301,11 +1076,6 @@ class AugmentOriMainDataset(BaseDataset):
 
 
     def _save(self, save_path):
-        """_summary_
-            保存已经处理好的数据
-        Arguments:
-            save_path -- 数据保存的位置
-        """
         if args.use_base:
             file_name='base_data.ds'
         else :
@@ -1372,11 +1142,9 @@ class AugmentOriMainDataset(BaseDataset):
             node_mask[idx][:node_size_li[idx]]=1.
 
         row_mask=np.expand_dims(row_mask,axis=2)
-        node_mask=np.expand_dims(node_mask,axis=1) # 这里是扩展一维用于后续计算
-
-        # todo 下面就是padding的过程了,这里可以顺便遍历的时候把mask也整了
+        node_mask=np.expand_dims(node_mask,axis=1) 
         
-        for idx,graph in enumerate(data_li): # 这里是一个node的信息
+        for idx,graph in enumerate(data_li): 
             data_tmp=list()
             for jdx,node in enumerate(graph):
                 data_tmp.append(np.pad(node,((0,batch_row_size-node.shape[0]),(0,0))))
@@ -1431,20 +1199,8 @@ class AugmentOriMainDataset(BaseDataset):
         # row_mask=torch.reshape(row_mask,(-1,row_mask.shape[-1]))
         row_mask=torch.stack(row_mask,dim=0).to(device)
         row_mask=torch.unsqueeze(row_mask,dim=1)
-        node_mask=torch.unsqueeze(node_mask,dim=1)  # 这里是扩展一维用于后续计算
-
-        # todo 下面就是padding的过程了,这里可以顺便遍历的时候把mask也整了
+        node_mask=torch.unsqueeze(node_mask,dim=1) 
         
-        
-        # 尝试用torch.nn.utis.rnn.pad_sequence
-        # for idx,graph in enumerate(data_li): # 这里是一个node的信息
-        #     data_tmp=list()
-        #     for jdx,node in enumerate(graph):
-        #         node_tmp=torch.tensor(node,device=device)
-        #         data_tmp.append(F.pad(node_tmp,(0,0,0,batch_row_size-node.shape[0])))
-
-        #     graph_tmp=torch.stack(data_tmp,dim=0)
-        #     data_li[idx]=F.pad(graph_tmp,(0,0,0,0,0,batch_node_size-graph_tmp.shape[0]))
         data_tmp=list()
         for graph in data_li:
             data_tmp.extend(graph)

@@ -6,7 +6,7 @@ import os
 import dgl
 
 my_seed = 0
-np.random.seed(seed=my_seed) # 不知道为什么这里好像控制不止这个seed
+np.random.seed(seed=my_seed)
 
 
 def model2onnx(
@@ -15,16 +15,6 @@ def model2onnx(
     input_tensor: torch.Tensor,
     save_dir: str = args.onnx_model,
 ) -> None:
-    """_summary_
-    这个函数首先要判断是不是要分架构进行训练，接下来判断输入的是模型还是模型的参数，leaderboard给的都是模型，ulp的数据集给的是模型的参数，最终执行完这个函数会把模型导出成onnx的格式，然后保存到指定的位置
-    Arguments:
-        model -- 输入的是一个模型，用来导出onnx的格式
-        model_name -- 这个是模型的名称，这里其实是一个路径
-        input_tensor -- 导出onnx必须给定一个输入，这个就是随机出的形状相同的输入张量
-
-    Keyword Arguments:
-        save_dir -- onnx文件保存的位置 (default: {args.onnx_model})
-    """
     if args.use_archi:
         if args.architecture != model_name.split('/')[-1].split('_')[1]:
             return
@@ -52,14 +42,6 @@ def model2onnx(
 def onnx2dgl(
     model_path: str,
 ) -> tuple:
-    """_summary_
-        这个函数的作用是把一个onnx格式的文件中的模型的最后一层参数提取到，然后根据超参数进行变换，如果是bin的指令，就是在参数的每一行按照0~1的大小进行分桶处理；如果是base的参数，就是手动提取一些特征，比如每一行的最大值和最小值等等。最后把处理后的结果返回
-    Arguments:
-        model_path -- 这个是onnx模型的保存轮径
-
-    Returns:
-        返回一个最后一层的参数矩阵
-    """
     # if args.use_archi:
     #     onnx_model_path = os.path.join(
     #         save_dir, args.architecture, model_name.split('/')[-1].split('.')[-2]+'.onnx')
@@ -71,9 +53,9 @@ def onnx2dgl(
 
     graph = onnx_model.graph
 
-    parameter_dict = dict()  # 网络参数
+    parameter_dict = dict()
 
-    for par in graph.initializer:  # 转换所有的网络参数
+    for par in graph.initializer:
         parameter_dict[par.name] = np.frombuffer(
             par.raw_data, dtype=np.float32
         ).reshape(par.dims)
@@ -166,8 +148,6 @@ def onnx2dgl(
             else:
                 raise ValueError(
                     f'model type not in list, the model_path is {model_path},and the type now is {model_path.split("/")[-1].split("_")[1]}')
-
-    # # 这里先用padding去解决问题了，但是后面感觉肯定不能这么整
     # arr=np.pad(arr, ((0, args.padding_dim-arr.shape[0]), (0, 0)), 'constant',constant_values=0)
     return arr_final
 
@@ -202,14 +182,13 @@ def pos_emb(
 def onnx2dgl2(
     model_path: str,
 ) -> tuple:
-    """现在这个里面我自己想的是要返回三个部分，一个就是图，这个图里面有各种各样的属性，包括op_type，size还有位置，然后还有一个参数矩阵，应该是二维的，一维是row_size一维是提取到的特征参数，最后一个就是返回这个数据的标签，现在考虑的就是在标签之前应该返回一个列表，表示原本每个row的大小，因为准备的是row直接padding到指定的大小，"""
     onnx_model = onnx.load(model_path)
 
     graph = onnx_model.graph
 
-    parameter_dict = dict()  # 网络参数
+    parameter_dict = dict()
 
-    for par in graph.initializer:  # 转换所有的网络参数
+    for par in graph.initializer:
         parameter_dict[par.name] = np.frombuffer(
             par.raw_data, dtype=np.float32
         ).reshape(par.dims)
@@ -230,15 +209,13 @@ def onnx2dgl2(
         raise ValueError(f'node size seeting small, needing {node_size}')
 
     for index, node in enumerate(graph.node):
-        # 首先是对参数的操作，然后是对结构的操作
         pos_arr[index]=index+1
         arr = None
         for in_put in node.input:
             row_arr = np.zeros((args.row_size, args.bin_num-1), dtype=np.float32)
-            # 想了一下，这一版还是主要考虑w这个参数
             if in_put in parameter_dict.keys() and (in_put.split('.')[-1] == 'weight' and parameter_dict[in_put].ndim == 2) or (in_put.startswith('onnx::Conv') and parameter_dict[in_put].ndim == 4):
                 arr = parameter_dict[in_put]
-                if arr.ndim == 4:  # 这个是conv的参数
+                if arr.ndim == 4:  
                     row_shape, _, _, _ = arr.shape
                     arr = arr.reshape((row_shape, -1))
 
@@ -251,7 +228,6 @@ def onnx2dgl2(
 
                     num_max = np.max(arr)
                     num_min = np.min(arr)
-                    # 把这个运算放到外面就只需要算一次了
                     arr_norm = (arr-num_min)/(num_max-num_min)
 
                     arr_mean = np.mean(arr)
@@ -306,30 +282,19 @@ def onnx2dgl2(
         else:
             row_size.append(0)
 
-        # 下面是处理图的数据的,这里的+1都是为了给空节点的0留位置
         op_type = np.zeros((args.op_type_size,), dtype=np.float32)
         op_index = args.op_li.index(node.op_type)
         op_type[op_index] = 1.
 
-        # 这里为了后续结构的统一，所以不提取size的那四维特征了
-        # node_size = np.zeros((4,), dtype=np.float32)
-        # if arr is not None:
-        #     if arr.ndim == 4:
-        #         node_size += np.array(arr.shape, dtype=np.float32)
-        #     elif arr.ndim == 2:
-        #         node_size[2:] += np.array(arr.shape, dtype=np.float32)
-        # node_size = pos_emb(node_size, args.pos_emb_dim).reshape((-1,))
 
         pos = pos_emb(np.array([index+1], dtype=np.float32),
                       args.hidden_dim//2).reshape((-1,))
 
-        # 现在还缺的就是一个pos_emb，然后把这些东西展开拼起来，最后还有就是mask的大小还没有确定。
         struct_arr = np.concatenate((op_type,  pos),axis=-1)
         struct_tensor = torch.FloatTensor(struct_arr)
         graph_par_li.append(struct_tensor)
 
-        # 下面是处理结构的连边关系的
-        for out in node.output:  # 得到节点输出用来图的连接
+        for out in node.output:  
             node_index[out] = index
 
         for in_put in node.input:
@@ -342,16 +307,15 @@ def onnx2dgl2(
     pos = pos_emb(np.array([0], dtype=np.float32),
                     args.hidden_dim//2).reshape((-1,))
     struct_arr = np.concatenate((op_type,  pos),axis=-1)
-    struct_tensor = torch.FloatTensor(struct_arr) # 这里直接计算出来，感觉速度会快很多
+    struct_tensor = torch.FloatTensor(struct_arr)
     for _ in range(args.num_nodes-node_size):
         row_size.append(0)
         graph_par_li.append(struct_tensor)
 
-    # 现在想的是这里直接把mask算好就完了，不在模型的forward中算了，不然有点麻烦
     row_mask = np.zeros((args.num_nodes, args.row_size), np.float32)
     for idx, r_size in enumerate(row_size):
         row_mask[idx, :r_size] = 1.
-    row_mask = np.expand_dims(row_mask, axis=1)    # 这里的shape就是(ns,1,rs)
+    row_mask = np.expand_dims(row_mask, axis=1)
 
     dgl_graph = dgl.to_bidirected(
         dgl.graph((edge_src, edge_dst), num_nodes=args.num_nodes))
@@ -366,19 +330,17 @@ def onnx2dgl2(
     node_mask = np.expand_dims(node_mask, axis=0)
 
     return dgl_graph, par_arr, row_mask, node_mask
-    # 读数据的部分大体上完成了，明天来了把网络的实现再改了就ok了
 
 def onnx2dglaug(
     model_path: str,
 ) -> tuple:
-    """现在这个里面我自己想的是要返回三个部分，一个就是图，这个图里面有各种各样的属性，包括op_type，size还有位置，然后还有一个参数矩阵，应该是二维的，一维是row_size一维是提取到的特征参数，最后一个就是返回这个数据的标签，现在考虑的就是在标签之前应该返回一个列表，表示原本每个row的大小，因为准备的是row直接padding到指定的大小，"""
     onnx_model = onnx.load(model_path)
 
     graph = onnx_model.graph
 
-    parameter_dict = dict()  # 网络参数
+    parameter_dict = dict()
 
-    for par in graph.initializer:  # 转换所有的网络参数
+    for par in graph.initializer:
         parameter_dict[par.name] = np.frombuffer(
             par.raw_data, dtype=np.float32
         ).reshape(par.dims)
@@ -399,16 +361,13 @@ def onnx2dglaug(
         raise ValueError(f'node size seeting small, needing {node_size}')
 
     for index, node in enumerate(graph.node):
-        # 首先是对参数的操作，然后是对结构的操作
         pos_arr[index]=index+1
         arr = None
         for in_put in node.input:
             row_arr = np.zeros((args.row_size, args.bin_num-1), dtype=np.float32)
-            # 想了一下，这一版还是主要考虑w这个参数
-            # todo 这里的参数选择还是有点问题，densenet中的参数有的名字是weight，但是是conv的参数.后面看了一下只有densenet存在这个问题，就还好,squeezenet中也存在这个问题
             if in_put in parameter_dict.keys() and (in_put.split('.')[-1] == 'weight' and parameter_dict[in_put].ndim > 1) or (in_put.startswith('onnx::Conv') and parameter_dict[in_put].ndim == 4):
                 arr = parameter_dict[in_put]
-                if arr.ndim == 4:  # 这个是conv的参数
+                if arr.ndim == 4:
                     row_shape, _, _, _ = arr.shape
                     arr = arr.reshape((row_shape, -1))
 
@@ -417,7 +376,6 @@ def onnx2dglaug(
                         f'row size is out of setting, now needing space is {arr.shape[0]}')
                 
                 if index!=node_size-1:
-                    # todo 其实这个挺完整的，就是扰动有点小，后面改一下
                     v_max=np.max(np.abs(arr))
                     m,n=arr.shape
                     noise=np.random.randn(m,n)*v_max*0.1
@@ -428,7 +386,6 @@ def onnx2dglaug(
 
                     num_max = np.max(arr)
                     num_min = np.min(arr)
-                    # 把这个运算放到外面就只需要算一次了
                     arr_norm = (arr-num_min)/(num_max-num_min)
 
                     arr_mean = np.mean(arr)
@@ -483,30 +440,20 @@ def onnx2dglaug(
         else:
             row_size.append(0)
 
-        # 下面是处理图的数据的,这里的+1都是为了给空节点的0留位置
         op_type = np.zeros((args.op_type_size,), dtype=np.float32)
         op_index = args.op_li.index(node.op_type)
         op_type[op_index] = 1.
 
-        # 这里为了后续结构的统一，所以不提取size的那四维特征了
-        # node_size = np.zeros((4,), dtype=np.float32)
-        # if arr is not None:
-        #     if arr.ndim == 4:
-        #         node_size += np.array(arr.shape, dtype=np.float32)
-        #     elif arr.ndim == 2:
-        #         node_size[2:] += np.array(arr.shape, dtype=np.float32)
-        # node_size = pos_emb(node_size, args.pos_emb_dim).reshape((-1,))
 
         pos = pos_emb(np.array([index+1], dtype=np.float32),
                       args.hidden_dim//2).reshape((-1,))
 
-        # 现在还缺的就是一个pos_emb，然后把这些东西展开拼起来，最后还有就是mask的大小还没有确定。
+
         struct_arr = np.concatenate((op_type,  pos),axis=-1)
         struct_tensor = torch.FloatTensor(struct_arr)
         graph_par_li.append(struct_tensor)
 
-        # 下面是处理结构的连边关系的
-        for out in node.output:  # 得到节点输出用来图的连接
+        for out in node.output:  
             node_index[out] = index
 
         for in_put in node.input:
@@ -519,16 +466,15 @@ def onnx2dglaug(
     pos = pos_emb(np.array([0], dtype=np.float32),
                     args.hidden_dim//2).reshape((-1,))
     struct_arr = np.concatenate((op_type,  pos),axis=-1)
-    struct_tensor = torch.FloatTensor(struct_arr) # 这里直接计算出来，感觉速度会快很多
+    struct_tensor = torch.FloatTensor(struct_arr)
     for _ in range(args.num_nodes-node_size):
         row_size.append(0)
         graph_par_li.append(struct_tensor)
 
-    # 现在想的是这里直接把mask算好就完了，不在模型的forward中算了，不然有点麻烦
     row_mask = np.zeros((args.num_nodes, args.row_size), np.float32)
     for idx, r_size in enumerate(row_size):
         row_mask[idx, :r_size] = 1.
-    row_mask = np.expand_dims(row_mask, axis=1)    # 这里的shape就是(ns,1,rs)
+    row_mask = np.expand_dims(row_mask, axis=1)
 
     dgl_graph = dgl.to_bidirected(
         dgl.graph((edge_src, edge_dst), num_nodes=args.num_nodes))
@@ -554,8 +500,8 @@ def get_mask(arr,ratio):
     abs_array=np.abs(arr)
     k = int(ratio * arr.size)
     if k==0:
-        k+=1    # 这里是让k不要为0，不然感觉会报错
-    threshold = np.partition(abs_array.flatten(), k)[k-1] # 这个函数的作用是找到第k小的数，其实这个函数的作用是分部分，第k的位置是对应的数，左边是比他小的，右边是比他大的
+        k+=1    
+    threshold = np.partition(abs_array.flatten(), k)[k-1] 
     mask = abs_array > threshold
     return mask.astype(np.float32)
 
@@ -564,14 +510,13 @@ def onnx2dgl_aug_ori(
     model_path: str,
     aug_index: int,
 ) -> tuple:
-    # todo 这里要改一下函数，目标就是在coll_fn再进行padding，那么我需要知道的内容有哪些，graph是可以不同大小自动拼接的，那么除了parameter以外，还要返回一个max_row_size和node_size。两个mask就都不用返回了，注意有值的地方是1，其余为0，在coll_fn写的时候要注意一下。parameter应该是一个列表，列表中的每个值都是一个numpy
     onnx_model = onnx.load(model_path)
 
     graph = onnx_model.graph
 
-    parameter_dict = dict()  # 网络参数
+    parameter_dict = dict() 
 
-    for par in graph.initializer:  # 转换所有的网络参数
+    for par in graph.initializer:  
         parameter_dict[par.name] = np.frombuffer(
             par.raw_data, dtype=np.float32
         ).reshape(par.dims)
@@ -592,16 +537,13 @@ def onnx2dgl_aug_ori(
         raise ValueError(f'node size seeting small, needing {node_size}')
 
     for index, node in enumerate(graph.node):
-        # 首先是对参数的操作，然后是对结构的操作
         pos_arr[index]=index+1
         arr = None
         row_arr = None
         for in_put in node.input:
-            # todo 对于没有参数的层，我只给了row_size为1，主要是为了给到两维，其余在coll_fn在后面padding
-            # 想了一下，这一版还是主要考虑w这个参数
             if in_put in parameter_dict.keys() and (in_put.split('.')[-1] == 'weight' and parameter_dict[in_put].ndim > 1) or (in_put.startswith('onnx::Conv') and parameter_dict[in_put].ndim == 4):
                 arr = parameter_dict[in_put]
-                if arr.ndim == 4:  # 这个是conv的参数
+                if arr.ndim == 4: 
                     row_shape, _, _, _ = arr.shape
                     arr = arr.reshape((row_shape, -1))
                     if aug_index!=0:
@@ -639,7 +581,6 @@ def onnx2dgl_aug_ori(
 
                     num_max = np.max(arr)
                     num_min = np.min(arr)
-                    # 把这个运算放到外面就只需要算一次了
                     arr_norm = (arr-num_min)/(num_max-num_min)
 
                     arr_mean = np.mean(arr)
@@ -690,14 +631,12 @@ def onnx2dgl_aug_ori(
                 
                 par_arr.append(torch.tensor(row_arr,dtype=torch.float32))            
 
-# todo 这个改掉一个bug，因为如果没有进入到内部循环的话，arr拿不到值，同样rowarr也没值，这样就不会加入到par_arr之中，所以就会导致拿到的值全部都是带参数的
         if arr is not None:
             row_size.append(arr.shape[0])
         else:
             row_size.append(0)
             par_arr.append(torch.zeros((1, args.bin_num-1), dtype=torch.float32))
 
-        # 下面是处理图的数据的,这里的+1都是为了给空节点的0留位置
         op_type = np.zeros((args.op_type_size,), dtype=np.float32)
         op_index = args.op_li.index(node.op_type)
         op_type[op_index] = 1.
@@ -705,33 +644,21 @@ def onnx2dgl_aug_ori(
         pos = pos_emb(np.array([index+1], dtype=np.float32),
                       args.hidden_dim//2).reshape((-1,))
 
-        # 现在还缺的就是一个pos_emb，然后把这些东西展开拼起来，最后还有就是mask的大小还没有确定。
         struct_arr = np.concatenate((op_type,  pos),axis=-1)
         struct_tensor = torch.FloatTensor(struct_arr)
         graph_par_li.append(struct_tensor)
 
-        # 下面是处理结构的连边关系的
-        for out in node.output:  # 得到节点输出用来图的连接
+        for out in node.output: 
             node_index[out] = index
 
         for in_put in node.input:
             if in_put in node_index.keys():
                 edge_src.append(node_index[in_put])
                 edge_dst.append(index)
-
-    # todo 到这里了
-    
-    # op_type = np.zeros((args.op_type_size,), dtype=np.float32)
-    # pos = pos_emb(np.array([0], dtype=np.float32),
-    #                 args.hidden_dim//2).reshape((-1,))
-    # # pos = np.zeros((args.hidden_dim,), dtype=np.float32)
-    # struct_arr = np.concatenate((op_type,  pos),axis=-1)
-    # struct_tensor = torch.FloatTensor(struct_arr) # 这里直接计算出来，感觉速度会快很多
-    # for _ in range(args.num_nodes-node_size):
-    #     graph_par_li.append(struct_tensor)         
+  
 
     dgl_graph = dgl.to_bidirected(
-        dgl.graph((edge_src, edge_dst), num_nodes=node_size)) # 这里直接给定nodesize就行了
+        dgl.graph((edge_src, edge_dst), num_nodes=node_size))
 
     graph_par_tensor = torch.stack(graph_par_li,dim=0)
     # par_tensor = torch.FloatTensor(par_arr)
@@ -746,14 +673,13 @@ def onnx2dgl_aug_ori(
 def onnx2dgltest(
     model_path: str,
 ) -> tuple:
-    """现在这个里面我自己想的是要返回三个部分，一个就是图，这个图里面有各种各样的属性，包括op_type，size还有位置，然后还有一个参数矩阵，应该是二维的，一维是row_size一维是提取到的特征参数，最后一个就是返回这个数据的标签，现在考虑的就是在标签之前应该返回一个列表，表示原本每个row的大小，因为准备的是row直接padding到指定的大小，"""
     onnx_model = onnx.load(model_path)
 
     graph = onnx_model.graph
 
-    parameter_dict = dict()  # 网络参数
+    parameter_dict = dict()
 
-    for par in graph.initializer:  # 转换所有的网络参数
+    for par in graph.initializer:
         parameter_dict[par.name] = np.frombuffer(
             par.raw_data, dtype=np.float32
         ).reshape(par.dims)
@@ -771,14 +697,12 @@ def onnx2dgltest(
         raise ValueError(f'node size seeting small, needing {node_size}')
 
     for index, node in enumerate(graph.node):
-        # 首先是对参数的操作，然后是对结构的操作
         arr = None
         for in_put in node.input:
             row_arr = np.zeros((args.row_size, args.bin_num-1), dtype=np.float32)
-            # 想了一下，这一版还是主要考虑w这个参数
             if in_put in parameter_dict.keys() and ((in_put.split('.')[-1] == 'weight' and parameter_dict[in_put].ndim == 2) or (in_put.startswith('onnx::Conv') and parameter_dict[in_put].ndim == 4)):
                 arr = parameter_dict[in_put]
-                if arr.ndim == 4:  # 这个是conv的参数
+                if arr.ndim == 4:
                     row_shape, _, _, _ = arr.shape
                     arr = arr.reshape((row_shape, -1))
 
@@ -790,7 +714,6 @@ def onnx2dgltest(
 
                     num_max = np.max(arr)
                     num_min = np.min(arr)
-                    # 把这个运算放到外面就只需要算一次了
                     arr_norm = (arr-num_min)/(num_max-num_min)
 
                     arr_mean = np.mean(arr)
@@ -851,11 +774,10 @@ def onnx2dgltest(
     for _ in range(args.num_nodes-node_size):
         row_size.append(0)
 
-    # 现在想的是这里直接把mask算好就完了，不在模型的forward中算了，不然有点麻烦
     row_mask = np.zeros((args.num_nodes, args.row_size), np.float32)
     for idx, r_size in enumerate(row_size):
         row_mask[idx, :r_size] = 1.
-    row_mask = np.expand_dims(row_mask, axis=1)    # 这里的shape就是(ns,1,rs)
+    row_mask = np.expand_dims(row_mask, axis=1)
 
     par_tensor = torch.FloatTensor(par_arr)
 
@@ -886,20 +808,18 @@ def onnx2dgltest(
             f'model type not in list, the model_path is {model_path},and the type now is {model_path.split("/")[-1].split("_")[1]}')
 
     return par_tensor, row_mask, node_mask, archi
-    # 读数据的部分大体上完成了，明天来了把网络的实现再改了就ok了
 
 
 def onnx2dgl_posemb_test(
     model_path: str,
 ) -> tuple:
-    """现在这个里面我自己想的是要返回三个部分，一个就是图，这个图里面有各种各样的属性，包括op_type，size还有位置，然后还有一个参数矩阵，应该是二维的，一维是row_size一维是提取到的特征参数，最后一个就是返回这个数据的标签，现在考虑的就是在标签之前应该返回一个列表，表示原本每个row的大小，因为准备的是row直接padding到指定的大小，"""
     onnx_model = onnx.load(model_path)
 
     graph = onnx_model.graph
 
-    parameter_dict = dict()  # 网络参数
+    parameter_dict = dict()
 
-    for par in graph.initializer:  # 转换所有的网络参数
+    for par in graph.initializer:
         parameter_dict[par.name] = np.frombuffer(
             par.raw_data, dtype=np.float32
         ).reshape(par.dims)
@@ -918,15 +838,13 @@ def onnx2dgl_posemb_test(
         raise ValueError(f'node size seeting small, needing {node_size}')
 
     for index, node in enumerate(graph.node):
-        # 首先是对参数的操作，然后是对结构的操作
         pos_arr[index]=index+1
         arr = None
         for in_put in node.input:
             row_arr = np.zeros((args.row_size, args.bin_num-1), dtype=np.float32)
-            # 想了一下，这一版还是主要考虑w这个参数
             if in_put in parameter_dict.keys() and ((in_put.split('.')[-1] == 'weight' and parameter_dict[in_put].ndim == 2) or (in_put.startswith('onnx::Conv') and parameter_dict[in_put].ndim == 4)):
                 arr = parameter_dict[in_put]
-                if arr.ndim == 4:  # 这个是conv的参数
+                if arr.ndim == 4:
                     row_shape, _, _, _ = arr.shape
                     arr = arr.reshape((row_shape, -1))
 
@@ -938,7 +856,6 @@ def onnx2dgl_posemb_test(
 
                     num_max = np.max(arr)
                     num_min = np.min(arr)
-                    # 把这个运算放到外面就只需要算一次了
                     arr_norm = (arr-num_min)/(num_max-num_min)
 
                     arr_mean = np.mean(arr)
@@ -995,11 +912,10 @@ def onnx2dgl_posemb_test(
     for _ in range(args.num_nodes-node_size):
         row_size.append(0)
 
-    # 现在想的是这里直接把mask算好就完了，不在模型的forward中算了，不然有点麻烦
     row_mask = np.zeros((args.num_nodes, args.row_size), np.float32)
     for idx, r_size in enumerate(row_size):
         row_mask[idx, :r_size] = 1.
-    row_mask = np.expand_dims(row_mask, axis=1)    # 这里的shape就是(ns,1,rs)
+    row_mask = np.expand_dims(row_mask, axis=1)
 
     node_mask = np.zeros(args.num_nodes, dtype=np.float32)
     node_mask[:node_size] = 1.
@@ -1023,14 +939,13 @@ def onnx2dgl_posemb_test(
 def onnx2dgl_pos_main(
     model_path: str,
 ) -> tuple:
-    """现在这个里面我自己想的是要返回三个部分，一个就是图，这个图里面有各种各样的属性，包括op_type，size还有位置，然后还有一个参数矩阵，应该是二维的，一维是row_size一维是提取到的特征参数，最后一个就是返回这个数据的标签，现在考虑的就是在标签之前应该返回一个列表，表示原本每个row的大小，因为准备的是row直接padding到指定的大小，"""
     onnx_model = onnx.load(model_path)
 
     graph = onnx_model.graph
 
-    parameter_dict = dict()  # 网络参数
+    parameter_dict = dict()
 
-    for par in graph.initializer:  # 转换所有的网络参数
+    for par in graph.initializer:
         parameter_dict[par.name] = np.frombuffer(
             par.raw_data, dtype=np.float32
         ).reshape(par.dims)
@@ -1051,16 +966,13 @@ def onnx2dgl_pos_main(
         raise ValueError(f'node size seeting small, needing {node_size}')
 
     for index, node in enumerate(graph.node):
-        # 首先是对参数的操作，然后是对结构的操作
-        # todo 这个位置使用了倒排的索引，让所有的最后一层的参数都是1
         pos_arr[index]=node_size-index
         arr = None
         for in_put in node.input:
             row_arr = np.zeros((args.row_size, args.bin_num-1), dtype=np.float32)
-            # 想了一下，这一版还是主要考虑w这个参数
             if in_put in parameter_dict.keys() and (in_put.split('.')[-1] == 'weight' and parameter_dict[in_put].ndim == 2) or (in_put.startswith('onnx::Conv') and parameter_dict[in_put].ndim == 4):
                 arr = parameter_dict[in_put]
-                if arr.ndim == 4:  # 这个是conv的参数
+                if arr.ndim == 4:
                     row_shape, _, _, _ = arr.shape
                     arr = arr.reshape((row_shape, -1))
 
@@ -1073,7 +985,6 @@ def onnx2dgl_pos_main(
 
                     num_max = np.max(arr)
                     num_min = np.min(arr)
-                    # 把这个运算放到外面就只需要算一次了
                     arr_norm = (arr-num_min)/(num_max-num_min)
 
                     arr_mean = np.mean(arr)
@@ -1128,30 +1039,19 @@ def onnx2dgl_pos_main(
         else:
             row_size.append(0)
 
-        # 下面是处理图的数据的,这里的+1都是为了给空节点的0留位置
         op_type = np.zeros((args.op_type_size,), dtype=np.float32)
         op_index = args.op_li.index(node.op_type)
         op_type[op_index] = 1.
 
-        # 这里为了后续结构的统一，所以不提取size的那四维特征了
-        # node_size = np.zeros((4,), dtype=np.float32)
-        # if arr is not None:
-        #     if arr.ndim == 4:
-        #         node_size += np.array(arr.shape, dtype=np.float32)
-        #     elif arr.ndim == 2:
-        #         node_size[2:] += np.array(arr.shape, dtype=np.float32)
-        # node_size = pos_emb(node_size, args.pos_emb_dim).reshape((-1,))
 
         pos = pos_emb(np.array([index+1], dtype=np.float32),
                       args.hidden_dim//2).reshape((-1,))
 
-        # 现在还缺的就是一个pos_emb，然后把这些东西展开拼起来，最后还有就是mask的大小还没有确定。
         struct_arr = np.concatenate((op_type,  pos),axis=-1)
         struct_tensor = torch.FloatTensor(struct_arr)
         graph_par_li.append(struct_tensor)
 
-        # 下面是处理结构的连边关系的
-        for out in node.output:  # 得到节点输出用来图的连接
+        for out in node.output:
             node_index[out] = index
 
         for in_put in node.input:
@@ -1164,16 +1064,15 @@ def onnx2dgl_pos_main(
     pos = pos_emb(np.array([0], dtype=np.float32),
                     args.hidden_dim//2).reshape((-1,))
     struct_arr = np.concatenate((op_type,  pos),axis=-1)
-    struct_tensor = torch.FloatTensor(struct_arr) # 这里直接计算出来，感觉速度会快很多
+    struct_tensor = torch.FloatTensor(struct_arr)
     for _ in range(args.num_nodes-node_size):
         row_size.append(0)
         graph_par_li.append(struct_tensor)
 
-    # 现在想的是这里直接把mask算好就完了，不在模型的forward中算了，不然有点麻烦
     row_mask = np.zeros((args.num_nodes, args.row_size), np.float32)
     for idx, r_size in enumerate(row_size):
         row_mask[idx, :r_size] = 1.
-    row_mask = np.expand_dims(row_mask, axis=1)    # 这里的shape就是(ns,1,rs)
+    row_mask = np.expand_dims(row_mask, axis=1)
 
     dgl_graph = dgl.to_bidirected(
         dgl.graph((edge_src, edge_dst), num_nodes=args.num_nodes))
@@ -1190,4 +1089,3 @@ def onnx2dgl_pos_main(
     pos_emb_arr=pos_emb(pos_arr,args.hidden_dim//2)
 
     return dgl_graph, par_arr, row_mask, node_mask, pos_emb_arr
-    # 读数据的部分大体上完成了，明天来了把网络的实现再改了就ok了
